@@ -1,0 +1,58 @@
+remote_exec "$node" "sudo bash -s" <<'EOF'
+cat >/etc/haproxy/haproxy.cfg <<'EOCFG'
+global
+    log /dev/log local0
+    maxconn 4096
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log     global
+    mode    tcp
+    option  tcplog
+    option  dontlognull
+    retries 3
+    timeout connect 10s
+    timeout client 1m
+    timeout server 1m
+
+frontend kubernetes_api
+    bind ${VIP}:6443
+    default_backend kubernetes_api_back
+
+backend kubernetes_api_back
+    mode tcp
+    balance roundrobin
+    option tcp-check
+    default-server check inter 3s rise 2 fall 3
+EOCFG
+EOF
+
+  # now append dynamic backends
+  remote_exec "$node" "echo -e \"${backend_cfg}\" | sudo tee -a /etc/haproxy/haproxy.cfg > /dev/null"
+  remote_exec "$node" "sudo bash -s" <<'EOF'
+cat >>/etc/haproxy/haproxy.cfg <<'EOCFG'
+frontend rke2_supervisor
+    bind ${VIP}:9346
+    default_backend rke2_supervisor_back
+
+backend rke2_supervisor_back
+    mode tcp
+    balance roundrobin
+    option tcp-check
+    default-server check inter 3s rise 2 fall 3
+EOCFG
+EOF
+  remote_exec "$node" "echo -e \"${rke2_backend_cfg}\" | sudo tee -a /etc/haproxy/haproxy.cfg > /dev/null"
+
+  # ---- append stats listener ----
+  remote_exec "$node" "sudo bash -c 'cat >> /etc/haproxy/haproxy.cfg <<EOSTATS
+listen stats
+    bind ${VIP}:8404
+    mode http
+    stats enable
+    stats uri /
+    stats refresh 10s
+    stats auth admin:admin
+EOSTATS'"
