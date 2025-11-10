@@ -229,3 +229,7 @@ listen stats
     stats refresh 10s
     stats auth admin:admin
 #########
+
+
+[INFO] Step 2: Configuring HAProxy + Keepalived on all mgmt nodes
+[INFO] Setting up HAProxy + Keepalived on pdstmntrctrlprd01
