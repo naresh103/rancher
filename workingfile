@@ -233,3 +233,11 @@ listen stats
 
 [INFO] Step 2: Configuring HAProxy + Keepalived on all mgmt nodes
 [INFO] Setting up HAProxy + Keepalived on pdstmntrctrlprd01
+
+
+remote_exec "$node" "sudo bash -s" <<'EOF'
+cat >/etc/haproxy/haproxy.cfg <<'EOCFG'
+<your haproxy config here>
+EOCFG
+EOF
+
