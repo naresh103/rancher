@@ -1,4 +1,29 @@
-remote_exec "$node" "sudo bash -s" <<'EOF'
+setup_haproxy_keepalived() {
+  local node=$1
+  local priority=$2
+  local STATE=$3
+  log "Setting up HAProxy + Keepalived on $node as ${STATE} (priority ${priority})"
+
+  # Build backend configuration for Kubernetes API
+  local backend_cfg=""
+  for host in "${MGMT_NODES[@]}"; do
+    backend_cfg+="    server ${host} ${host}:6443 check\n"
+  done
+
+  # Build backend configuration for RKE2 supervisor API
+  local rke2_backend_cfg=""
+  local i=0
+  for host in "${MGMT_NODES[@]}"; do
+    if [[ $i -eq 0 ]]; then
+      rke2_backend_cfg+="    server ${host} ${host}:9346 check\n"
+    else
+      rke2_backend_cfg+="    server ${host} ${host}:9346 check backup\n"
+    fi
+    ((i++))
+  done
+
+  # Create HAProxy config
+  remote_exec "$node" "sudo bash -s" <<EOF
 cat >/etc/haproxy/haproxy.cfg <<'EOCFG'
 global
     log /dev/log local0
@@ -26,13 +51,8 @@ backend kubernetes_api_back
     balance roundrobin
     option tcp-check
     default-server check inter 3s rise 2 fall 3
-EOCFG
-EOF
+$(echo -e "${backend_cfg}")
 
-  # now append dynamic backends
-  remote_exec "$node" "echo -e \"${backend_cfg}\" | sudo tee -a /etc/haproxy/haproxy.cfg > /dev/null"
-  remote_exec "$node" "sudo bash -s" <<'EOF'
-cat >>/etc/haproxy/haproxy.cfg <<'EOCFG'
 frontend rke2_supervisor
     bind ${VIP}:9346
     default_backend rke2_supervisor_back
@@ -42,12 +62,8 @@ backend rke2_supervisor_back
     balance roundrobin
     option tcp-check
     default-server check inter 3s rise 2 fall 3
-EOCFG
-EOF
-  remote_exec "$node" "echo -e \"${rke2_backend_cfg}\" | sudo tee -a /etc/haproxy/haproxy.cfg > /dev/null"
+$(echo -e "${rke2_backend_cfg}")
 
-  # ---- append stats listener ----
-  remote_exec "$node" "sudo bash -c 'cat >> /etc/haproxy/haproxy.cfg <<EOSTATS
 listen stats
     bind ${VIP}:8404
     mode http
@@ -55,4 +71,61 @@ listen stats
     stats uri /
     stats refresh 10s
     stats auth admin:admin
-EOSTATS'"
+EOCFG
+EOF
+
+  # Create HAProxy health-check script
+  remote_exec "$node" "sudo bash -c 'cat >/usr/local/bin/check-haproxy.sh <<EOS
+#!/bin/bash
+systemctl is-active --quiet haproxy
+EOS
+chmod +x /usr/local/bin/check-haproxy.sh'"
+
+  # Create Keepalived notification script
+  remote_exec "$node" "sudo bash -c 'cat >/usr/local/bin/keepalived-notify.sh <<EOS
+#!/bin/bash
+logger -t keepalived \"Transition to \$1 on \$(hostname)\"
+EOS
+chmod +x /usr/local/bin/keepalived-notify.sh'"
+
+  # Create Keepalived config (best-practice version)
+  remote_exec "$node" "sudo bash -c 'cat >/etc/keepalived/keepalived.conf <<EOKEEP
+vrrp_script chk_haproxy {
+    script \"/usr/local/bin/check-haproxy.sh\"
+    interval 3
+    timeout 2
+    fall 3
+    rise 2
+}
+
+vrrp_instance VI_1 {
+    state ${STATE}
+    interface ${VIP_INTERFACE}
+    virtual_router_id 51
+    priority ${priority}
+    advert_int 1
+    nopreempt
+    garp_master_delay 1
+    garp_master_repeat 2
+    authentication {
+        auth_type PASS
+        auth_pass 42secret
+    }
+    virtual_ipaddress {
+        ${VIP}/24 dev ${VIP_INTERFACE} label ${VIP_INTERFACE}:1
+    }
+    track_script {
+        chk_haproxy
+    }
+    notify_master \"/usr/local/bin/keepalived-notify.sh master\"
+    notify_backup \"/usr/local/bin/keepalived-notify.sh backup\"
+    notify_fault  \"/usr/local/bin/keepalived-notify.sh fault\"
+}
+EOKEEP'"
+
+  # Enable and start services
+  remote_exec "$node" "sudo systemctl daemon-reexec && sudo systemctl daemon-reload"
+  remote_exec "$node" "sudo systemctl enable --now haproxy keepalived"
+
+  log "HAProxy and Keepalived configured and started on $node (${STATE})"
+}
