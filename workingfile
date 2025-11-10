@@ -163,3 +163,69 @@ backend rke2_servers
     server pdstmntrctrlprd01 pdstmntrctrlprd01:9345 check 
     server pdstmntrctrlprd02 pdstmntrctrlprd02:9345 check 
     server pdstmntrctrlprd03 pdstmntrctrlprd03:9345 check 
+
+
+
+
+##########
+
+global
+    log /dev/log local0
+    maxconn 4096
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log     global
+    mode    tcp
+    option  tcplog
+    option  dontlognull
+    retries 3
+    timeout connect 10s
+    timeout client 1m
+    timeout server 1m
+
+#-------------------------------------------------
+# Frontend: Kubernetes API
+#-------------------------------------------------
+frontend kubernetes_api
+    bind 172.17.21.150:6443
+    default_backend kubernetes_api_back
+
+backend kubernetes_api_back
+    mode tcp
+    balance roundrobin
+    option tcp-check
+    default-server check inter 3s rise 2 fall 3
+    server pdstmntrctrlprd01 pdstmntrctrlprd01:6443 check
+    server pdstmntrctrlprd02 pdstmntrctrlprd02:6443 check
+    server pdstmntrctrlprd03 pdstmntrctrlprd03:6443 check
+
+#-------------------------------------------------
+# Frontend: RKE2 Supervisor API
+#-------------------------------------------------
+frontend rke2_supervisor
+    bind 172.17.21.150:9346
+    default_backend rke2_supervisor_back
+
+backend rke2_supervisor_back
+    mode tcp
+    balance roundrobin
+    option tcp-check
+    default-server check inter 3s rise 2 fall 3
+    server pdstmntrctrlprd01 pdstmntrctrlprd01:9346 check
+    server pdstmntrctrlprd02 pdstmntrctrlprd02:9346 check backup
+    server pdstmntrctrlprd03 pdstmntrctrlprd03:9346 check backup
+
+#-------------------------------------------------
+# Optional: HAProxy Stats Page
+#-------------------------------------------------
+listen stats
+    bind 172.17.21.150:8404
+    mode http
+    stats enable
+    stats uri /
+    stats refresh 10s
+    stats auth admin:admin
+#########
