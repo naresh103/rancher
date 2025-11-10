@@ -129,3 +129,37 @@ EOKEEP'"
 
   log "HAProxy and Keepalived configured and started on $node (${STATE})"
 }
+
+
+global
+  log /dev/log local0
+  maxconn 4096
+  user haproxy
+  group haproxy
+  daemon
+
+defaults
+  log global
+  mode tcp
+  option tcplog
+  timeout connect 10s
+  timeout client 1m
+  timeout server 1m
+
+frontend k8s_api
+  bind *:6444
+  default_backend k8s_servers
+
+backend k8s_servers
+    server pdstmntrctrlprd01 pdstmntrctrlprd01:6443 check 
+    server pdstmntrctrlprd02 pdstmntrctrlprd02:6443 check 
+    server pdstmntrctrlprd03 pdstmntrctrlprd03:6443 check 
+
+frontend rke2_api
+  bind *:9346
+  default_backend rke2_servers
+
+backend rke2_servers
+    server pdstmntrctrlprd01 pdstmntrctrlprd01:9345 check 
+    server pdstmntrctrlprd02 pdstmntrctrlprd02:9345 check 
+    server pdstmntrctrlprd03 pdstmntrctrlprd03:9345 check 
