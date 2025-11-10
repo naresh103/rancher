@@ -1,0 +1,14 @@
+local backend_cfg=""
+local port=9346
+local i=0
+
+for host in "${MGMT_NODES[@]}"; do
+    if [[ $i -eq 0 ]]; then
+        # First node = primary (no backup flag)
+        backend_cfg+="    server ${host} ${host}:${port} check\n"
+    else
+        # Remaining nodes = backup
+        backend_cfg+="    server ${host} ${host}:${port} check backup\n"
+    fi
+    ((i++))
+done
