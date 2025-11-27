@@ -1,0 +1,52 @@
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    maxconn 10000
+    tune.ssl.default-dh-param 2048
+    chroot /var/lib/haproxy
+    user haproxy
+    group haproxy
+    daemon
+
+    # Enable SSL
+    ssl-default-bind-options no-sslv3 no-tlsv10 no-tlsv11
+    ssl-default-bind-ciphers PROFILE=SYSTEM
+
+defaults
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    timeout connect 10s
+    timeout client  1m
+    timeout server  1m
+    option  http-server-close
+    option  forwardfor
+
+frontend rancher_https
+    bind *:443 ssl crt /etc/haproxy/certs/rancher.pem
+    mode http
+
+    # Force host header to Rancher hostname
+    http-request set-header Host rancherdev.corp.advancestores.com
+
+    # Redirect HTTP to HTTPS
+frontend rancher_http
+    bind *:80
+    mode http
+    redirect scheme https code 301 if !{ ssl_fc }
+
+    # Send all HTTPS traffic to Rancher UI backend
+    default_backend rancher_backend
+
+backend rancher_backend
+    mode http
+    option httpchk GET /healthz
+
+    # Add Rancher-required headers
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Forwarded-For %[src]
+
+    server rke2-01 192.168.10.101:443 ssl verify none check
+    server rke2-02 192.168.10.102:443 ssl verify none check backup
+    server rke2-03 192.168.10.103:443 ssl verify none check backup
