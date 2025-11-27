@@ -1,0 +1,78 @@
+install_rancher() {
+  local node=${MGMT_NODES[0]}
+  log "Installing Helm, cert-manager, and Rancher on $node"
+
+  remote_exec $node "
+    set -e
+
+    KCTL=/var/lib/rancher/rke2/bin/kubectl
+    export PATH=/usr/local/bin:\$PATH
+
+    #######################################################
+    # Install Helm
+    #######################################################
+    if ! command -v helm >/dev/null 2>&1; then
+      curl -sL https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz -o helm.tgz
+      tar -xzf helm.tgz
+      mv linux-amd64/helm /usr/local/bin/helm
+      chmod +x /usr/local/bin/helm
+      rm -rf helm.tgz linux-amd64
+    fi
+
+    #######################################################
+    # Wait for Kubernetes API
+    #######################################################
+    echo 'Waiting for Kubernetes API...'
+    for i in {1..40}; do
+      if \$KCTL get nodes >/dev/null 2>&1; then break; fi
+      sleep 5
+    done
+
+    mkdir -p /root/.kube
+    cp /etc/rancher/rke2/rke2.yaml /root/.kube/config
+
+    #######################################################
+    # Add Helm repos with retry
+    #######################################################
+    retry() { for i in {1..5}; do \$@ && return 0 || sleep 5; done; return 1; }
+
+    retry helm repo add rancher-stable https://releases.rancher.com/server-charts/stable || true
+    retry helm repo add jetstack https://charts.jetstack.io || true
+    retry helm repo update
+
+    #######################################################
+    # Install cert-manager
+    #######################################################
+    if ! \$KCTL -n cert-manager get deploy cert-manager >/dev/null 2>&1; then
+      helm install cert-manager jetstack/cert-manager \
+        --namespace cert-manager \
+        --create-namespace \
+        --set installCRDs=true
+    fi
+
+    echo 'Waiting for cert-manager to be fully ready...'
+    \$KCTL -n cert-manager rollout status deploy/cert-manager --timeout=180s
+    \$KCTL -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
+    \$KCTL -n cert-manager rollout status deploy/cert-manager-cainjector --timeout=180s
+
+    # Wait for all pods
+    \$KCTL -n cert-manager wait --for=condition=Available --timeout=180s deployment --all
+
+    #######################################################
+    # Install Rancher
+    #######################################################
+    if ! \$KCTL -n cattle-system get deploy rancher >/dev/null 2>&1; then
+      helm install ${CLUSTER_NAME} rancher-stable/rancher \
+        --namespace cattle-system \
+        --create-namespace \
+        --set hostname=${LB_FQDN} \
+        --version ${RANCHER_VERSION}
+    fi
+
+    echo 'Waiting for Rancher deployments...'
+    \$KCTL -n cattle-system rollout status deploy/rancher --timeout=300s
+
+    echo 'Waiting for cluster agents...'
+    \$KCTL -n cattle-system wait --for=condition=Available --timeout=300s deployment --all
+  "
+}
