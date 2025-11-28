@@ -1,0 +1,31 @@
+setting up Rancher with certs - example
+
+Docs : https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/resources/add-tls-secrets
+
+install rke2
+
+curl -sfL https://get.rke2.io |  sh -
+set up env
+
+echo "export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/usr/local/bin/:/var/lib/rancher/rke2/bin/" >> ~/.bashrc
+source ~/.bashrc
+install helm
+
+curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+add repos
+
+helm repo add rancher-latest https://releases.rancher.com/server-charts/latest --force-update 
+helm repo add jetstack https://charts.jetstack.io --force-update 
+install cert-manager
+
+helm upgrade -i cert-manager jetstack/cert-manager -n cert-manager --create-namespace --set crds.enabled=true 
+add secrets
+
+kubectl create ns cattle-system
+
+kubectl -n cattle-system create secret tls tls-rancher-ingress --cert=/root/star.rfed.io.cert --key=/root/star.rfed.io.key
+
+kubectl -n cattle-system create secret generic tls-ca --from-file=/root/cacerts.pem 
+install rancher with tls certs
+
+helm upgrade -i rancher rancher-latest/rancher -n cattle-system --create-namespace --set hostname=rancher.rfed.io --set bootstrapPassword=bootStrapAllTheThings --set replicas=1 --set ingress.tls.source=secret --set ingress.tls.secretName=tls-rancher-ingress --set privateCA=true 
