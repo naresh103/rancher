@@ -26,3 +26,14 @@ charts.bitnami.com
 s3.amazonaws.com
 blob.core.windows.net
 storage.googleapis.com
+
+
+#Mirantis
+
+registry.mirantis.com
+get.mirantis.com
+auth.mirantis.com
+*.mirantis.com
+get.k0s.sh
+*.k0s.io
+github.com/k0sproject
