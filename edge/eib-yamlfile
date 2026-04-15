@@ -24,8 +24,6 @@ operatingSystem:
       encryptedPassword: "$6$e4e1b6babcbc03a4$urd0Eikn35gEnWPNc/2W.s.5BaEbY5gsjtJjITI4T22FqipEzFSuucZAXR8YKleAjD3lczRbwzcrVROV2lIyB1"
     - username: edgeadmin
       createHomeDir: true
-      groups:
-        - wheel
       encryptedPassword: "$6$e4e1b6babcbc03a4$urd0Eikn35gEnWPNc/2W.s.5BaEbY5gsjtJjITI4T22FqipEzFSuucZAXR8YKleAjD3lczRbwzcrVROV2lIyB1"
       sshKeys:
         - "ssh-ed25519 AAAA... replace-with-your-admin-key"
