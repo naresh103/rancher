@@ -1,0 +1,37 @@
+cat > /eib/eib-config.yaml <<'EOF'
+apiVersion: 1.3
+
+image:
+  imageType: iso
+  arch: x86_64
+  baseImage: SL-Micro.x86_64-6.2-Base-SelfInstall-GM.install.iso
+  outputImageName: suse-edge-scale-remote-prod.iso
+
+operatingSystem:
+  isoConfiguration:
+    installDevice: /dev/vda
+
+  time:
+    timezone: America/New_York
+    ntp:
+      forceWait: true
+      pools:
+        - 0.us.pool.ntp.org
+        - 1.us.pool.ntp.org
+
+  users:
+    - username: root
+      encryptedPassword: "$6$e4e1b6babcbc03a4$urd0Eikn35gEnWPNc/2W.s.5BaEbY5gsjtJjITI4T22FqipEzFSuucZAXR8YKleAjD3lczRbwzcrVROV2lIyB1"
+    - username: edgeadmin
+      createHomeDir: true
+      groups:
+        - wheel
+      encryptedPassword: "$6$e4e1b6babcbc03a4$urd0Eikn35gEnWPNc/2W.s.5BaEbY5gsjtJjITI4T22FqipEzFSuucZAXR8YKleAjD3lczRbwzcrVROV2lIyB1"
+      sshKeys:
+        - "ssh-ed25519 AAAA... replace-with-your-admin-key"
+
+  systemd:
+    enable:
+      - sshd
+      - chronyd
+EOF
