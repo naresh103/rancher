@@ -1,0 +1,1 @@
+mkdir -p /eib/{base-images,elemental,network,files} && touch /eib/eib-config.yaml /eib/elemental/elemental_config.yaml /eib/network/_all.yaml
