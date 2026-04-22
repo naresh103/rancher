@@ -1,0 +1,12 @@
+transactional-update shell
+# Inside the shell:
+zypper ar -f https://download.opensuse.org/tumbleweed/repo/oss/ repo-oss
+zypper ref
+exit
+
+
+# List all Elemental machines
+kubectl get machineinventories.elemental.cattle.io -A
+
+# Look for your specific host
+kubectl get machineinventories.elemental.cattle.io -A | grep -i WIN-9G9K0TH816L
