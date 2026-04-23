@@ -111,3 +111,177 @@ edge-store962-002:/var/lib/rancher/agent # cat /var/lib/rancher/agent/applied/20
     "Checksum": "22bfc88343233e7fd39582b91e519c317add648dc0ecf1c4a41d680a28c0525b"
 }
 edge-store962-002:/var/lib/rancher/agent # 
+
+
+
+##########
+
+## Now We Have the Complete Picture — This Is an Install Failure, Not a Plan Failure
+
+Great — the plan is healthy and well-formed. Let me decode what it's telling us:
+
+### Plan analysis
+
+```json
+"instructions": [{
+  "name": "install",
+  "image": "rancher/system-agent-installer-k3s:v1.33.10-k3s1",
+  "args": ["-c", "run.sh"],
+  "command": "sh"
+}]
+```
+
+**Translation:** The plan instructs the agent to:
+1. Pull the container image `rancher/system-agent-installer-k3s:v1.33.10-k3s1`
+2. Extract and run the `run.sh` installer from inside it
+3. That installer places the K3s binary at `/var/lib/rancher/k3s/data/...` and creates `k3s.service`
+
+The plan is **correct**. It has `cluster-init: true` (this is the bootstrap node), valid token, valid config. Two important things also stand out:
+
+1. **`CATTLE_SERVER: https://rancheredge.corp.advancestores.com`** — the node needs to pull the installer image through Rancher's system-agent image flow, which typically means pulling from `docker.io` (or whatever registry Rancher is configured with).
+2. **`registries.yaml`** decoded is `{"configs":{},"mirrors":null}` — **no private registry mirror is configured**. The node is expected to pull `rancher/system-agent-installer-k3s:v1.33.10-k3s1` directly from Docker Hub.
+
+3. **`rke2: false` in CATTLE_FEATURES** — confirms this is a K3s provisioning, not RKE2. Normal.
+
+### What this means
+
+The agent successfully:
+- ✅ Registered with Rancher
+- ✅ Downloaded the plan
+- ✅ Wrote `/etc/rancher/k3s/config.yaml.d/50-rancher.yaml`
+- ✅ Wrote the `cluster-agent.yaml` manifest
+- ✅ Wrote the `idempotent.sh` helper
+- ❌ **Failed (or silently skipped) the `install` instruction** — because there's no `k3s.service` afterward
+- ✅ Marked the plan "applied" anyway (this is the real bug — idempotence script may have marked it done without actually running install successfully)
+
+---
+
+## Step 1 — Verify the Installer Image Was Pulled and Run
+
+The agent pulls the installer image using whatever container runtime it can find. Check:
+
+```bash
+# Does a container runtime exist?
+which docker podman nerdctl crictl ctr
+
+# If Docker is present:
+docker images 2>/dev/null | grep system-agent-installer
+
+# If nothing, the agent uses its built-in pull logic and extracts to:
+ls -la /var/lib/rancher/agent/work/ 2>/dev/null
+find /var/lib/rancher -name "run.sh" 2>/dev/null
+find / -name "system-agent-installer*" 2>/dev/null
+```
+
+If you find nothing, **the image pull failed**.
+
+---
+
+## Step 2 — Look for the Actual Install Attempt in the Logs
+
+The probe spam is hiding the real errors. Filter hard:
+
+```bash
+journalctl -u rancher-system-agent --no-pager \
+  | grep -viE "probe|x509|server-ca.crt|kube-scheduler|kube-controller-manager|kube-apiserver|loading CA|appending ca" \
+  | grep -iE "install|image|pull|run.sh|installer|exec|error|failed|checksum|instruction|applied"
+```
+
+You are looking specifically for lines mentioning:
+- `rancher/system-agent-installer-k3s`
+- `pulling image` / `pulled` / `pull failed`
+- `running instruction install`
+- `exit code` (any non-zero)
+- `no such host` / `connection refused` / `x509` on the **image registry** (not K3s internal)
+
+---
+
+## Step 3 — Pull the Installer Image Manually (The Real Test)
+
+This is the definitive test. Try to do what the agent is supposed to do:
+
+```bash
+# Try each runtime available:
+docker pull rancher/system-agent-installer-k3s:v1.33.10-k3s1
+# or
+podman pull rancher/system-agent-installer-k3s:v1.33.10-k3s1
+# or if neither:
+curl -v https://registry-1.docker.io/v2/rancher/system-agent-installer-k3s/manifests/v1.33.10-k3s1
+```
+
+**If this fails**, you've found the problem. The most likely failure modes at an edge store location:
+
+| Error you'll see | Root cause | Fix |
+|---|---|---|
+| `no such host: registry-1.docker.io` | DNS can't resolve Docker Hub | Fix DNS, or point to internal registry |
+| `connection timed out` | Firewall/proxy blocks outbound 443 to Docker Hub | Open egress, or use proxy |
+| `x509: certificate signed by unknown authority` | TLS interception proxy (Zscaler/Palo Alto) not trusted | Add corporate CA to OS trust |
+| `manifest unknown` / `404` | Version tag truly doesn't exist | Change cluster K8s version |
+| `toomanyrequests` / `401 unauthorized` | Docker Hub rate limit | Auth or internal mirror |
+| Pull hangs/is slow | MTU or proxy issue | Investigate network |
+
+---
+
+## Step 4 — Most Likely Fix: You Need a Private Registry Mirror
+
+For a 5,000-site edge deployment with a domain like `rancheredge.corp.advancestores.com`, **you are almost certainly behind a corporate proxy or firewall that blocks direct Docker Hub access** — which is why the installer image pull is silently failing.
+
+The `registries.yaml` in the plan is empty:
+```
+{"configs":{},"mirrors":null}
+```
+
+This needs to be populated with your internal registry (Harbor, JFrog, etc.) that mirrors `docker.io`. On the Rancher cluster spec, you need to configure:
+
+```yaml
+# In the cluster's "Registries" config (Cluster Management → Edit Cluster → Advanced → Registries)
+mirrors:
+  docker.io:
+    endpoint:
+      - "https://harbor.corp.advancestores.com/v2/dockerhub-mirror"
+configs:
+  "harbor.corp.advancestores.com":
+    auth:
+      username: "..."
+      password: "..."
+    tls:
+      caFile: /etc/ssl/certs/corp-ca.crt   # if using internal CA
+```
+
+**This is the #1 blocker at scale.** Without a registry mirror, you can't reliably provision 15,000 edge nodes even if this one worked — Docker Hub rate limits alone would kill you by site 200.
+
+---
+
+## Step 5 — Quick Recovery Test Right Now
+
+To test whether it's purely a pull-time network issue, try to force a re-install manually on this node:
+
+```bash
+# Remove the "applied" marker so the agent retries
+rm -f /var/lib/rancher/agent/applied/20260423-151008-applied.plan
+
+# Restart and watch live
+systemctl restart rancher-system-agent
+journalctl -u rancher-system-agent -f --no-pager \
+  | grep -viE "probe|x509|server-ca.crt|kube-|loading CA|appending ca"
+```
+
+You should see the agent redownload the plan and **this time you'll see the image pull attempt in clean text** (without the probe spam). That's your answer.
+
+---
+
+## Summary of Where We Are
+
+| Layer | Status |
+|---|---|
+| Rancher → agent communication | ✅ Working |
+| Plan generation & delivery | ✅ Working |
+| Agent marked plan applied | ⚠️ Falsely — the install step didn't actually run |
+| K3s installer image pull | ❌ Almost certainly failing silently |
+| K3s binary / service | ❌ Never installed |
+
+**Run Step 3 first** — `docker pull rancher/system-agent-installer-k3s:v1.33.10-k3s1` (or podman, or whatever runtime exists). The result of that single command will tell us:
+- If it succeeds → the plan execution logic itself is broken (we'd dig into agent internals)
+- If it fails with network/TLS/DNS error → you need a registry mirror (and this is what you'll hit at 5,000 sites regardless)
+
+Given your domain (`corp.advancestores.com`) and edge store use case, I'm 90% confident this is a corporate network egress / registry mirror issue. Fix it here once, bake it into the Elemental image, and your 5,000-site rollout will actually work.
