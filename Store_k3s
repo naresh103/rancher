@@ -1,3 +1,39 @@
+for host in index.docker.io auth.docker.io registry-1.docker.io production.cloudflare.docker.com; do
+  echo -n "=== $host → "
+  timeout 8 openssl s_client -connect ${host}:443 -servername ${host} </dev/null 2>&1 \
+    | grep -E "verify return|CONNECTED|error|BEGIN CERTIFICATE" | head -3
+  echo
+done
+
+
+This tests the exact four hosts the agent's pull flow needs. One of these will likely fail and give us a real answer.
+If All Four Hosts Work
+Then we have a legitimate agent bug and need to go directly to a ground-truth diagnostic. Run this to see what system calls the agent is actually making:
+bash# Check if strace is available
+which strace || transactional-update pkg install -y strace
+
+# Stop the managed service
+systemctl stop rancher-system-agent
+rm -rf /var/lib/rancher/agent/applied/* /var/lib/rancher/agent/work/*
+
+# Trace the agent while it attempts a pull
+strace -f -e trace=network,openat,execve -o /tmp/agent.strace \
+  /opt/rancher-system-agent/bin/rancher-system-agent sentinel &
+AGENT_PID=$!
+
+# Let it try once
+sleep 45
+kill $AGENT_PID 2>/dev/null
+systemctl start rancher-system-agent  # restart the service properly
+
+# Find the pull activity
+grep -E "connect|openat.*work|openat.*image|execve.*run" /tmp/agent.strace | head -80
+
+
+
+
+
+
 edge-store962-002:/var/lib/rancher/agent/applied # echo | openssl s_client -connect index.docker.io:443 -servername index.docker.io 2>&1 | head -40
 Connecting to 54.172.107.181
 depth=3 C=US, ST=Arizona, L=Scottsdale, O=Starfield Technologies, Inc., CN=Starfield Services Root Certificate Authority - G2
