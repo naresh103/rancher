@@ -10,3 +10,104 @@ kubectl get machineinventories.elemental.cattle.io -A
 
 # Look for your specific host
 kubectl get machineinventories.elemental.cattle.io -A | grep -i WIN-9G9K0TH816L
+
+
+
+edge-store962-002:/var/lib/rancher/agent # cat /var/lib/rancher/agent/applied/20260423-151008-applied.plan | python3 -m json.tool
+{
+    "Plan": {
+        "files": [
+            {
+                "content": "eyJjb25maWdzIjp7fSwibWlycm9ycyI6bnVsbH0=",
+                "path": "/etc/rancher/agent/registries.yaml"
+            },
+            {
+                "content": "eyJjb25maWdzIjp7fSwibWlycm9ycyI6bnVsbH0=",
+                "path": "/etc/rancher/k3s/registries.yaml"
+            },
+            {
+                "content": "ewogICJhZ2VudC10b2tlbiI6ICJycTVkc2g4anE2cGJobG52bXI5OG1seHNiNWZ2Z25oYnJ0NWNzN2pseHM0dmZzcXdoZ2ZwZGYiLAogICJjbHVzdGVyLWluaXQiOiB0cnVlLAogICJkaXNhYmxlLWFwaXNlcnZlciI6IGZhbHNlLAogICJkaXNhYmxlLWNsb3VkLWNvbnRyb2xsZXIiOiBmYWxzZSwKICAiZGlzYWJsZS1jb250cm9sbGVyLW1hbmFnZXIiOiBmYWxzZSwKICAiZGlzYWJsZS1ldGNkIjogZmFsc2UsCiAgImRpc2FibGUta3ViZS1wcm94eSI6IGZhbHNlLAogICJkaXNhYmxlLW5ldHdvcmstcG9saWN5IjogZmFsc2UsCiAgImRpc2FibGUtc2NoZWR1bGVyIjogZmFsc2UsCiAgImRvY2tlciI6IGZhbHNlLAogICJldGNkLWV4cG9zZS1tZXRyaWNzIjogZmFsc2UsCiAgImV0Y2QtczMtYnVja2V0LWxvb2t1cC10eXBlIjogImF1dG8iLAogICJldGNkLXNuYXBzaG90LXJldGVudGlvbiI6IDUsCiAgImV0Y2Qtc25hcHNob3Qtc2NoZWR1bGUtY3JvbiI6ICIwICovNSAqICogKiIsCiAgImt1YmUtY29udHJvbGxlci1tYW5hZ2VyLWFyZyI6IFsKICAgICJjZXJ0LWRpcj0vdmFyL2xpYi9yYW5jaGVyL2szcy9zZXJ2ZXIvdGxzL2t1YmUtY29udHJvbGxlci1tYW5hZ2VyIiwKICAgICJzZWN1cmUtcG9ydD0xMDI1NyIKICBdLAogICJrdWJlLXNjaGVkdWxlci1hcmciOiBbCiAgICAiY2VydC1kaXI9L3Zhci9saWIvcmFuY2hlci9rM3Mvc2VydmVyL3Rscy9rdWJlLXNjaGVkdWxlciIsCiAgICAic2VjdXJlLXBvcnQ9MTAyNTkiCiAgXSwKICAibm9kZS1sYWJlbCI6IFsKICAgICJya2UuY2F0dGxlLmlvL21hY2hpbmU9NWY5ZGJlMmQtZDA4Yi00OTk0LTk1ZTItODE1Nzc1NjA5Zjc4IgogIF0sCiAgInByaXZhdGUtcmVnaXN0cnkiOiAiL2V0Yy9yYW5jaGVyL2szcy9yZWdpc3RyaWVzLnlhbWwiLAogICJwcm90ZWN0LWtlcm5lbC1kZWZhdWx0cyI6IGZhbHNlLAogICJzZWNyZXRzLWVuY3J5cHRpb24iOiBmYWxzZSwKICAic2VjcmV0cy1lbmNyeXB0aW9uLXByb3ZpZGVyIjogImFlc2NiYyIsCiAgInNlbGludXgiOiBmYWxzZSwKICAidG9rZW4iOiAic2xudnNzOTcycXQ3cG53azYybm53ZzlrcWM5eDlna3JnZmY1bGdoZmZsc3RkZ3Z6cGhkbjJyIgp9",
+                "path": "/etc/rancher/k3s/config.yaml.d/50-rancher.yaml"
+            },
+            {
+                "content": "Ci0tLQphcGlWZXJzaW9uOiByYmFjLmF1dGhvcml6YXRpb24uazhzLmlvL3YxCmtpbmQ6IENsdXN0ZXJSb2xlCm1ldGFkYXRhOgogIG5hbWU6IHByb3h5LWNsdXN0ZXJyb2xlLWt1YmVhcGlzZXJ2ZXIKcnVsZXM6Ci0gYXBpR3JvdXBzOiBbIiJdCiAgcmVzb3VyY2VzOgogIC0gbm9kZXMvbWV0cmljcwogIC0gbm9kZXMvcHJveHkKICAtIG5vZGVzL3N0YXRzCiAgLSBub2Rlcy9sb2cKICAtIG5vZGVzL3NwZWMKICB2ZXJiczogWyJnZXQiLCAibGlzdCIsICJ3YXRjaCIsICJjcmVhdGUiXQotLS0KYXBpVmVyc2lvbjogcmJhYy5hdXRob3JpemF0aW9uLms4cy5pby92MQpraW5kOiBDbHVzdGVyUm9sZUJpbmRpbmcKbWV0YWRhdGE6CiAgbmFtZTogcHJveHktcm9sZS1iaW5kaW5nLWt1YmVybmV0ZXMtbWFzdGVyCnJvbGVSZWY6CiAgYXBpR3JvdXA6IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8KICBraW5kOiBDbHVzdGVyUm9sZQogIG5hbWU6IHByb3h5LWNsdXN0ZXJyb2xlLWt1YmVhcGlzZXJ2ZXIKc3ViamVjdHM6Ci0gYXBpR3JvdXA6IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8KICBraW5kOiBVc2VyCiAgbmFtZToga3ViZS1hcGlzZXJ2ZXIKLS0tCmFwaVZlcnNpb246IHYxCmtpbmQ6IE5hbWVzcGFjZQptZXRhZGF0YToKICBuYW1lOiBjYXR0bGUtc3lzdGVtCgotLS0KCmFwaVZlcnNpb246IHYxCmtpbmQ6IFNlcnZpY2VBY2NvdW50Cm1ldGFkYXRhOgogIG5hbWU6IGNhdHRsZQogIG5hbWVzcGFjZTogY2F0dGxlLXN5c3RlbQoKLS0tCgphcGlWZXJzaW9uOiByYmFjLmF1dGhvcml6YXRpb24uazhzLmlvL3YxCmtpbmQ6IENsdXN0ZXJSb2xlQmluZGluZwptZXRhZGF0YToKICBuYW1lOiBjYXR0bGUtYWRtaW4tYmluZGluZwogIG5hbWVzcGFjZTogY2F0dGxlLXN5c3RlbQogIGxhYmVsczoKICAgIGNhdHRsZS5pby9jcmVhdG9yOiAibm9ybWFuIgpzdWJqZWN0czoKLSBraW5kOiBTZXJ2aWNlQWNjb3VudAogIG5hbWU6IGNhdHRsZQogIG5hbWVzcGFjZTogY2F0dGxlLXN5c3RlbQpyb2xlUmVmOgogIGtpbmQ6IENsdXN0ZXJSb2xlCiAgbmFtZTogY2F0dGxlLWFkbWluCiAgYXBpR3JvdXA6IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8KCi0tLQoKYXBpVmVyc2lvbjogdjEKa2luZDogU2VjcmV0Cm1ldGFkYXRhOgogIG5hbWU6IGNhdHRsZS1jcmVkZW50aWFscy03NmM5MTgxN2ZiCiAgbmFtZXNwYWNlOiBjYXR0bGUtc3lzdGVtCnR5cGU6IE9wYXF1ZQpkYXRhOgogIHVybDogImFIUjBjSE02THk5eVlXNWphR1Z5WldSblpTNWpiM0p3TG1Ga2RtRnVZMlZ6ZEc5eVpYTXVZMjl0IgogIHRva2VuOiAiY201b2FHUjRablI2ZDNjMGRtaDNkRGQzY0hBNWNuaHRhbU0zYm1zMmNUSTNNbkZxY1Rsd09UVmlkbVJvWm0xck1tUmllamx1IgogIG5hbWVzcGFjZTogIll5MXRMVFJzZURZMWVHMDMiCgotLS0KCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3RlclJvbGUKbWV0YWRhdGE6CiAgbmFtZTogY2F0dGxlLWFkbWluCiAgbGFiZWxzOgogICAgY2F0dGxlLmlvL2NyZWF0b3I6ICJub3JtYW4iCnJ1bGVzOgotIGFwaUdyb3VwczoKICAtICcqJwogIHJlc291cmNlczoKICAtICcqJwogIHZlcmJzOgogIC0gJyonCi0gbm9uUmVzb3VyY2VVUkxzOgogIC0gJyonCiAgdmVyYnM6CiAgLSAnKicKCi0tLQoKYXBpVmVyc2lvbjogYXBwcy92MQpraW5kOiBEZXBsb3ltZW50Cm1ldGFkYXRhOgogIG5hbWU6IGNhdHRsZS1jbHVzdGVyLWFnZW50CiAgbmFtZXNwYWNlOiBjYXR0bGUtc3lzdGVtCiAgYW5ub3RhdGlvbnM6CiAgICBtYW5hZ2VtZW50LmNhdHRsZS5pby9zY2FsZS1hdmFpbGFibGU6ICIyIgpzcGVjOgogIHNlbGVjdG9yOgogICAgbWF0Y2hMYWJlbHM6CiAgICAgIGFwcDogY2F0dGxlLWNsdXN0ZXItYWdlbnQKICB0ZW1wbGF0ZToKICAgIG1ldGFkYXRhOgogICAgICBsYWJlbHM6CiAgICAgICAgYXBwOiBjYXR0bGUtY2x1c3Rlci1hZ2VudAogICAgc3BlYzoKICAgICAgYWZmaW5pdHk6CiAgICAgICAgbm9kZUFmZmluaXR5OgogICAgICAgICAgcHJlZmVycmVkRHVyaW5nU2NoZWR1bGluZ0lnbm9yZWREdXJpbmdFeGVjdXRpb246CiAgICAgICAgICAtIHByZWZlcmVuY2U6CiAgICAgICAgICAgICAgbWF0Y2hFeHByZXNzaW9uczoKICAgICAgICAgICAgICAtIGtleTogbm9kZS1yb2xlLmt1YmVybmV0ZXMuaW8vY29udHJvbHBsYW5lCiAgICAgICAgICAgICAgICBvcGVyYXRvcjogSW4KICAgICAgICAgICAgICAgIHZhbHVlczoKICAgICAgICAgICAgICAgIC0gInRydWUiCiAgICAgICAgICAgIHdlaWdodDogMTAwCiAgICAgICAgICAtIHByZWZlcmVuY2U6CiAgICAgICAgICAgICAgbWF0Y2hFeHByZXNzaW9uczoKICAgICAgICAgICAgICAtIGtleTogbm9kZS1yb2xlLmt1YmVybmV0ZXMuaW8vY29udHJvbC1wbGFuZQogICAgICAgICAgICAgICAgb3BlcmF0b3I6IEluCiAgICAgICAgICAgICAgICB2YWx1ZXM6CiAgICAgICAgICAgICAgICAtICJ0cnVlIgogICAgICAgICAgICB3ZWlnaHQ6IDEwMAogICAgICAgICAgLSBwcmVmZXJlbmNlOgogICAgICAgICAgICAgIG1hdGNoRXhwcmVzc2lvbnM6CiAgICAgICAgICAgICAgLSBrZXk6IGNhdHRsZS5pby9jbHVzdGVyLWFnZW50CiAgICAgICAgICAgICAgICBvcGVyYXRvcjogSW4KICAgICAgICAgICAgICAgIHZhbHVlczoKICAgICAgICAgICAgICAgIC0gInRydWUiCiAgICAgICAgICAgIHdlaWdodDogMQogICAgICAgICAgcmVxdWlyZWREdXJpbmdTY2hlZHVsaW5nSWdub3JlZER1cmluZ0V4ZWN1dGlvbjoKICAgICAgICAgICAgbm9kZVNlbGVjdG9yVGVybXM6CiAgICAgICAgICAgIC0gbWF0Y2hFeHByZXNzaW9uczoKICAgICAgICAgICAgICAtIGtleToga3ViZXJuZXRlcy5pby9vcwogICAgICAgICAgICAgICAgb3BlcmF0b3I6IE5vdEluCiAgICAgICAgICAgICAgICB2YWx1ZXM6CiAgICAgICAgICAgICAgICAtIHdpbmRvd3MKICAgICAgICBwb2RBbnRpQWZmaW5pdHk6CiAgICAgICAgICBwcmVmZXJyZWREdXJpbmdTY2hlZHVsaW5nSWdub3JlZER1cmluZ0V4ZWN1dGlvbjoKICAgICAgICAgIC0gcG9kQWZmaW5pdHlUZXJtOgogICAgICAgICAgICAgIGxhYmVsU2VsZWN0b3I6CiAgICAgICAgICAgICAgICBtYXRjaEV4cHJlc3Npb25zOgogICAgICAgICAgICAgICAgLSBrZXk6IGFwcAogICAgICAgICAgICAgICAgICBvcGVyYXRvcjogSW4KICAgICAgICAgICAgICAgICAgdmFsdWVzOgogICAgICAgICAgICAgICAgICAtIGNhdHRsZS1jbHVzdGVyLWFnZW50CiAgICAgICAgICAgICAgdG9wb2xvZ3lLZXk6IGt1YmVybmV0ZXMuaW8vaG9zdG5hbWUKICAgICAgICAgICAgd2VpZ2h0OiAxMDAKICAgICAgc2VydmljZUFjY291bnROYW1lOiBjYXR0bGUKICAgICAgdG9sZXJhdGlvbnM6CiAgICAgICMgTm8gdGFpbnRzIG9yIG5vIGNvbnRyb2xwbGFuZSBub2RlcyBmb3VuZCwgYWRkZWQgZGVmYXVsdHMKICAgICAgLSBlZmZlY3Q6IE5vU2NoZWR1bGUKICAgICAgICBrZXk6IG5vZGUtcm9sZS5rdWJlcm5ldGVzLmlvL2NvbnRyb2xwbGFuZQogICAgICAgIHZhbHVlOiAidHJ1ZSIKICAgICAgLSBlZmZlY3Q6IE5vU2NoZWR1bGUKICAgICAgICBrZXk6ICJub2RlLXJvbGUua3ViZXJuZXRlcy5pby9jb250cm9sLXBsYW5lIgogICAgICAgIG9wZXJhdG9yOiAiRXhpc3RzIgogICAgICBjb250YWluZXJzOgogICAgICAgIC0gbmFtZTogY2x1c3Rlci1yZWdpc3RlcgogICAgICAgICAgaW1hZ2VQdWxsUG9saWN5OiBJZk5vdFByZXNlbnQKICAgICAgICAgIGVudjoKICAgICAgICAgIC0gbmFtZTogQ0FUVExFX0ZFQVRVUkVTCiAgICAgICAgICAgIHZhbHVlOiAiZW1iZWRkZWQtY2x1c3Rlci1hcGk9ZmFsc2UsZmxlZXQ9ZmFsc2UsbWFuYWdlZC1zeXN0ZW0tdXBncmFkZS1jb250cm9sbGVyPWZhbHNlLG11bHRpLWNsdXN0ZXItbWFuYWdlbWVudD1mYWxzZSxtdWx0aS1jbHVzdGVyLW1hbmFnZW1lbnQtYWdlbnQ9dHJ1ZSxwcm92aXNpb25pbmdwcmVib290c3RyYXA9ZmFsc2UscHJvdmlzaW9uaW5ndjI9ZmFsc2UscmtlMj1mYWxzZSx0dXJ0bGVzPWZhbHNlLHVpLXNxbC1jYWNoZT10cnVlIgogICAgICAgICAgLSBuYW1lOiBDQVRUTEVfU0VSVkVSCiAgICAgICAgICAgIHZhbHVlOiAiaHR0cHM6Ly9yYW5jaGVyZWRnZS5jb3JwLmFkdmFuY2VzdG9yZXMuY29tIgogICAgICAgICAgLSBuYW1lOiBDQVRUTEVfQ0FfQ0hFQ0tTVU0KICAgICAgICAgICAgdmFsdWU6ICIyZjJiZDcxODJhZGY1MDAwMTU4YWMxMzA0YjRjYWM0MzFmODFlNjEzOWM0NzE2MDY5NjM1YzBlNjcxMDY4YmI4IgogICAgICAgICAgLSBuYW1lOiBDQVRUTEVfQ0xVU1RFUgogICAgICAgICAgICB2YWx1ZTogInRydWUiCiAgICAgICAgICAtIG5hbWU6IENBVFRMRV9LOFNfTUFOQUdFRAogICAgICAgICAgICB2YWx1ZTogInRydWUiCiAgICAgICAgICAtIG5hbWU6IENBVFRMRV9DTFVTVEVSX1JFR0lTVFJZCiAgICAgICAgICAgIHZhbHVlOiAiIgogICAgICAgICAgLSBuYW1lOiBDQVRUTEVfQ1JFREVOVElBTF9OQU1FCiAgICAgICAgICAgIHZhbHVlOiBjYXR0bGUtY3JlZGVudGlhbHMtNzZjOTE4MTdmYgogICAgICAgICAgLSBuYW1lOiBDQVRUTEVfU1VDX0FQUF9OQU1FX09WRVJSSURFCiAgICAgICAgICAgIHZhbHVlOiAiIgogICAgICAgICAgLSBuYW1lOiBDQVRUTEVfU0VSVkVSX1ZFUlNJT04KICAgICAgICAgICAgdmFsdWU6IHYyLjEzLjMKICAgICAgICAgIC0gbmFtZTogQ0FUVExFX0lOU1RBTExfVVVJRAogICAgICAgICAgICB2YWx1ZTogYmM2NGEwOTMtYzM5Ny00MmQzLWJkN2YtM2Y1M2I1NTYzODBiCiAgICAgICAgICAtIG5hbWU6IENBVFRMRV9JTkdSRVNTX0lQX0RPTUFJTgogICAgICAgICAgICB2YWx1ZTogc3NsaXAuaW8KICAgICAgICAgIC0gbmFtZTogU1RSSUNUX1ZFUklGWQogICAgICAgICAgICB2YWx1ZTogInRydWUiCiAgICAgICAgICBpbWFnZTogcmFuY2hlci9yYW5jaGVyLWFnZW50OnYyLjEzLjMKICAgICAgICAgIHZvbHVtZU1vdW50czoKICAgICAgICAgIC0gbmFtZTogY2F0dGxlLWNyZWRlbnRpYWxzCiAgICAgICAgICAgIG1vdW50UGF0aDogL2NhdHRsZS1jcmVkZW50aWFscwogICAgICAgICAgICByZWFkT25seTogdHJ1ZQogICAgICB2b2x1bWVzOgogICAgICAtIG5hbWU6IGNhdHRsZS1jcmVkZW50aWFscwogICAgICAgIHNlY3JldDoKICAgICAgICAgIHNlY3JldE5hbWU6IGNhdHRsZS1jcmVkZW50aWFscy03NmM5MTgxN2ZiCiAgICAgICAgICBkZWZhdWx0TW9kZTogMzIwCiAgc3RyYXRlZ3k6CiAgICB0eXBlOiBSb2xsaW5nVXBkYXRlCiAgICByb2xsaW5nVXBkYXRlOgogICAgICBtYXhVbmF2YWlsYWJsZTogMAogICAgICBtYXhTdXJnZTogMQotLS0KYXBpVmVyc2lvbjogdjEKa2luZDogU2VydmljZQptZXRhZGF0YToKICBuYW1lOiBjYXR0bGUtY2x1c3Rlci1hZ2VudAogIG5hbWVzcGFjZTogY2F0dGxlLXN5c3RlbQpzcGVjOgogIHBvcnRzOgogIC0gcG9ydDogODAKICAgIHRhcmdldFBvcnQ6IDgwCiAgICBwcm90b2NvbDogVENQCiAgICBuYW1lOiBodHRwCiAgLSBwb3J0OiA0NDMKICAgIHRhcmdldFBvcnQ6IDQ0NAogICAgcHJvdG9jb2w6IFRDUAogICAgbmFtZTogaHR0cHMtaW50ZXJuYWwKICBzZWxlY3RvcjoKICAgIGFwcDogY2F0dGxlLWNsdXN0ZXItYWdlbnQK",
+                "path": "/var/lib/rancher/k3s/server/manifests/rancher/cluster-agent.yaml"
+            },
+            {
+                "content": "CmFwaVZlcnNpb246IHYxCmtpbmQ6IENvbmZpZ01hcAptZXRhZGF0YToKICBuYW1lOiBrM3MtZXRjZC1zbmFwc2hvdC1leHRyYS1tZXRhZGF0YQogIG5hbWVzcGFjZToga3ViZS1zeXN0ZW0KZGF0YToKICBwcm92aXNpb25pbmctY2x1c3Rlci1zcGVjOiBINHNJQUFBQUFBQUEvOVJVVFkvYk5oRDlLOEVjVTNHempoRWcxYTFkYjRzZTJpN1dRWG9vZWhoVFk1c1F4V0dIUTJkVncvKzlvRDY4U3AwL1VPaWtlZFRNdlBmNGRJWTI3MGdDS2FYUEpNbHhnQnBPcTd2MSttNTEvMTI3VGl1b1FGcDY0TEIzQjZqUGtPTkJzS0d0Q2lvZCtsS3lIRlRZUDNrTTVhRE5JaFJzRHpXVXI1Zm9SdENGMzZNNkRxbDhTUUYzbmhxbzkrZ1RWYkJuc1hSOWM0ZkFRaHVranNPV05FR3RrcW1DaGp3cFBYWlIrNDJURFNwZUVaZEt3OGVUc3pwd21Ub2RCQzA5a1RodW9EYXJDdFIxeEZtaFhyMi9yeUMxTHY2QlRuOWkyUXk5UDQzd2xpeUhKa0Y5ZjZuZ0MwdExjc3R2clA5L21WMHFzRWNVL1l3K1U5bjlVa0dIOXVnQy9leDVoLzdWKzJrSmc5RWxraFBKZFkwWnNaNXpZeWJML2JjT1hDSFRZY0RETjQ2UTJ1YW1XTzZwaWNJdi9RMFVTSXNISnJKMzloWk85a2hOWHU1U0JoaDZpWnpJZEtUaWJQb2FTMnV6eTdZbE5aNjV6ZEZvSHdscXdLd01GU1N5UXBvTUJTdDkvTXFPVzZnc2ZYSk5HUTlJeWU0c3ZBcThKVTlXV1dhSi94ekNOS3ZOdGwxc0hZV1ZySnEyNU5XYmh2YVl2YWJGYU85Q2ZwbmVMNWUvS2hBNnVLVGlabHRIWmMrUUFzWjBaTjFPMGp6SWtQdjdOMi9mZlhqenRqeUY1WFRvbVpUQ1NQTERwWUpKYlJjT1k4OEdGVGRPQmhydVAvZm5pZG1uZ1ZXWi9NeWU1dXU4L0NrczYyT1lscFdtQk90SDJwZThERGQ0QnFZWm8zVFB0Qy9FV2hjYXFPSFhFZm9sbkNnb1N6L0wvSW02NkZFSktnallGVWVETlVsWjZQdVA3MDFrOWl0ei9PZGo5d1Vxd09oZS80amtxYU9nNk84c3FucTZjL3p1dE5xUjRxcTRPVFViR2tBRmYyY002clNIZWwxQkRrZENyOGYrTjI3bTlCV3RFeFNIRmtKdHJvYWVTeVk5Vy9RUFBpY2wrU0hyOFRFMGtWM1FBZjRYQUFELy93RUFBUC8vMzY1VGZyZ0ZBQUE9Cg==",
+                "path": "/var/lib/rancher/k3s/server/manifests/rancher/k3s-etcd-snapshot-extra-metadata.yaml"
+            },
+            {
+                "path": "/var/lib/rancher/k3s/server/manifests/rancher/addons.yaml"
+            },
+            {
+                "path": "/var/lib/rancher/k3s/server/manifests/rancher/managed-chart-config.yaml"
+            },
+            {
+                "content": "CiMhL2Jpbi9zaAoKY3VycmVudEhhc2g9IiIKa2V5PSQxCnRhcmdldEhhc2g9JDIKaGFzaGVkQ21kPSQzCmNtZD0kNApjYXByRGlyPSQ1CnNoaWZ0IDUKCmRhdGFSb290PSIkY2FwckRpci9pZGVtcG90ZW5jZS8ka2V5LyRoYXNoZWRDbWQvJHRhcmdldEhhc2giCmF0dGVtcHRGaWxlPSIkZGF0YVJvb3QvbGFzdC1hdHRlbXB0IgoKY3VycmVudEF0dGVtcHQ9JChjYXQgIiRhdHRlbXB0RmlsZSIgfHwgZWNobyAiLTEiKQoKaWYgWyAiJGN1cnJlbnRBdHRlbXB0IiAhPSAiJENBVFRMRV9BR0VOVF9BVFRFTVBUX05VTUJFUiIgXTsgdGhlbgoJbWtkaXIgLXAgIiRkYXRhUm9vdCIKCWVjaG8gIiRDQVRUTEVfQUdFTlRfQVRURU1QVF9OVU1CRVIiID4gIiRhdHRlbXB0RmlsZSIKCWV4ZWMgIiRjbWQiICIkQCIKZWxzZQoJZWNobyAiYWN0aW9uIGhhcyBhbHJlYWR5IGJlZW4gcmVjb25jaWxlZCB0byB0aGUgdGFyZ2V0IGhhc2ggJHRhcmdldEhhc2ggYXQgYXR0ZW1wdCAkY3VycmVudEF0dGVtcHQiCmZpCg==",
+                "path": "/var/lib/rancher/capr/idempotence/idempotent.sh"
+            }
+        ],
+        "instructions": [
+            {
+                "name": "install",
+                "image": "rancher/system-agent-installer-k3s:v1.33.10-k3s1",
+                "env": [
+                    "RESTART_STAMP=a497665fcd7bc1761c61423a8ea091952207fbd97f216c4dbfe9cf3ba979860a",
+                    "DRAIN_HASH=7d9892049f41abba70e7192d5f93b6c5d865de0a7109acf33fa08bac6ec39865",
+                    "K3S_DATA_DIR=/var/lib/rancher/k3s"
+                ],
+                "args": [
+                    "-c",
+                    "run.sh"
+                ],
+                "command": "sh"
+            }
+        ],
+        "probes": {
+            "kube-apiserver": {
+                "initialDelaySeconds": 1,
+                "timeoutSeconds": 5,
+                "successThreshold": 1,
+                "failureThreshold": 2,
+                "httpGet": {
+                    "url": "https://localhost:6443/readyz",
+                    "clientCert": "/var/lib/rancher/k3s/server/tls/client-kube-apiserver.crt",
+                    "clientKey": "/var/lib/rancher/k3s/server/tls/client-kube-apiserver.key",
+                    "caCert": "/var/lib/rancher/k3s/server/tls/server-ca.crt"
+                }
+            },
+            "kube-controller-manager": {
+                "initialDelaySeconds": 1,
+                "timeoutSeconds": 5,
+                "successThreshold": 1,
+                "failureThreshold": 2,
+                "httpGet": {
+                    "url": "https://localhost:10257/healthz",
+                    "caCert": "/var/lib/rancher/k3s/server/tls/kube-controller-manager/kube-controller-manager.crt"
+                }
+            },
+            "kube-scheduler": {
+                "initialDelaySeconds": 1,
+                "timeoutSeconds": 5,
+                "successThreshold": 1,
+                "failureThreshold": 2,
+                "httpGet": {
+                    "url": "https://localhost:10259/healthz",
+                    "caCert": "/var/lib/rancher/k3s/server/tls/kube-scheduler/kube-scheduler.crt"
+                }
+            },
+            "kubelet": {
+                "initialDelaySeconds": 1,
+                "timeoutSeconds": 5,
+                "successThreshold": 1,
+                "failureThreshold": 2,
+                "httpGet": {
+                    "url": "http://localhost:10248/healthz"
+                }
+            }
+        }
+    },
+    "Checksum": "22bfc88343233e7fd39582b91e519c317add648dc0ecf1c4a41d680a28c0525b"
+}
+edge-store962-002:/var/lib/rancher/agent # 
