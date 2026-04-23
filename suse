@@ -1,4 +1,121 @@
+# Same Failure — Agent Still Failing After the One-Liner
 
+The agent PID has changed (22980 → 23982) so your restart worked, and it's retrying — but the exact same pattern is happening. 1 second from "Pulling image" to "run.sh: command not found."
+
+I don't yet know whether the CA install in the one-liner actually did anything, because we didn't capture the diagnostic output. We need to back up and **prove each assumption** before we move on.
+
+Please run these commands in order and paste the **full output** for each. This will tell us definitively what's going on.
+
+## Diagnostic 1: What cert chain does the VM see for Docker Hub?
+
+```bash
+echo | openssl s_client -showcerts -connect index.docker.io:443 -servername index.docker.io 2>/dev/null \
+  | openssl crl2pkcs7 -nocrl \
+  | openssl pkcs7 -print_certs -noout
+```
+
+This prints the `subject` and `issuer` for every cert in the chain. **This is the single most important piece of evidence we need right now.** Two outcomes:
+
+- If issuers are `Amazon`, `DigiCert`, `Let's Encrypt`, or similar well-known CAs → **no TLS interception**, and my whole theory is wrong
+- If issuers reference your corporate names (Advance Auto, Zscaler, Palo Alto, Fortinet, Netskope, etc.) → **TLS interception confirmed**
+
+## Diagnostic 2: Did the one-liner actually produce a CA file?
+
+```bash
+ls -la /etc/pki/trust/anchors/
+cat /etc/pki/trust/anchors/corp-chain.pem 2>/dev/null | head -5
+```
+
+If `corp-chain.pem` doesn't exist, the one-liner's openssl step failed silently.
+
+## Diagnostic 3: Did `update-ca-certificates` actually update the trust bundle?
+
+```bash
+# Did the bundle change?
+ls -la /var/lib/ca-certificates/ca-bundle.pem /etc/ssl/ca-bundle.pem 2>/dev/null
+grep -c "BEGIN CERTIFICATE" /var/lib/ca-certificates/ca-bundle.pem 2>/dev/null
+grep -c "BEGIN CERTIFICATE" /etc/ssl/ca-bundle.pem 2>/dev/null
+```
+
+## Diagnostic 4: Does Go-style TLS validation now succeed?
+
+This is the most important test — directly checking what `rancher-system-agent` sees:
+
+```bash
+# Pull with podman WITHOUT insecure=true — does it work now?
+# First revert the insecure setting
+grep -A2 "insecure" /etc/containers/registries.conf
+
+# Try without insecure
+podman pull docker.io/rancher/system-agent-installer-k3s:v1.33.10-k3s1
+```
+
+If podman now succeeds with verification enabled → trust store is fixed and the agent should work too. If it still fails → we haven't actually installed the right CA yet.
+
+## Diagnostic 5: What exactly did the agent do this time?
+
+We need to see the full verbose output from the agent during one failed pull, not just the filtered version:
+
+
+
+#####################################
+
+```bash
+# Temporarily enable debug logging on the agent
+mkdir -p /etc/systemd/system/rancher-system-agent.service.d/
+cat > /etc/systemd/system/rancher-system-agent.service.d/debug.conf <<'EOF'
+[Service]
+Environment="CATTLE_LOGLEVEL=debug"
+Environment="CATTLE_DEBUG=true"
+EOF
+systemctl daemon-reload
+
+# Clear state
+rm -rf /var/lib/rancher/agent/applied/* /var/lib/rancher/agent/work/*
+systemctl restart rancher-system-agent
+
+# Wait ~40 seconds for a full retry cycle
+sleep 40
+
+# Get the agent's pull-related messages in full
+journalctl -u rancher-system-agent --since "1 min ago" --no-pager \
+  | grep -viE "^.{0,200}probe|x509.*server-ca|loading CA|appending ca|kube-apiserver|kube-controller-manager|kube-scheduler|server-ca.crt"
+```
+
+**Please share the full output from diagnostic 5** — the debug mode should reveal the actual TLS error the agent is hitting, which has been invisible until now.
+
+## What I Suspect Is Happening
+
+Based on what we've seen, I have three live theories now:
+
+### Theory 1: The CA install worked for podman but not for the Go trust store path
+
+Go binaries on Linux read CAs from a list of paths. On SUSE Elemental the canonical path is `/var/lib/ca-certificates/ca-bundle.pem`. If `update-ca-certificates` regenerated `/etc/ssl/ca-bundle.pem` but not that specific file (or vice versa), Go still won't trust the CA. We need to verify which bundle the Go runtime on this system actually reads.
+
+### Theory 2: The openssl extraction pulled only leaf certs, not the CA
+
+The `awk` pattern grabs everything between `BEGIN CERTIFICATE` and `END CERTIFICATE`. If the server presents only leaf + intermediate but not the root, and your proxy's root is what's untrusted, installing the chain alone won't help. We'd need the corporate root CA specifically — usually obtainable from your security team or from another machine where it's already installed.
+
+### Theory 3: TLS interception isn't actually the issue
+
+This is the one we haven't properly ruled out. My theory came from the earlier `podman pull registry.suse.com` error. But it's entirely possible that:
+- `podman` hit a genuine cert issue on `registry.suse.com` (which is TLS-intercepted)
+- `index.docker.io` is NOT intercepted (your curl saw Amazon's cert earlier)
+- The agent failure is something else entirely
+
+If diagnostic 1 shows no interception on `index.docker.io`, we've been chasing the wrong thing for two rounds and I owe you an apology and a new theory.
+
+## The Most Important Thing Right Now
+
+**Please just run diagnostic 1 and paste the output.** That single command resolves the fundamental question: is there TLS interception on Docker Hub from this VM, or isn't there? Everything else depends on that answer.
+
+```bash
+echo | openssl s_client -showcerts -connect index.docker.io:443 -servername index.docker.io 2>/dev/null \
+  | openssl crl2pkcs7 -nocrl \
+  | openssl pkcs7 -print_certs -noout
+```
+
+I've been proceeding on a confident theory without enough evidence. Let's get the evidence first.
 
 
 # Same Failure — Confirming the Agent Ignores Podman's Config
