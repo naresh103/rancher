@@ -1,0 +1,95 @@
+# That's Extremely Significant — Empty Output Means No TLS Handshake At All
+
+The command completed with **zero output**. That's not "no interception" — that's **no TLS connection happened at all**. The `openssl s_client` call produced nothing for `crl2pkcs7` to parse, so nothing was printed.
+
+This means one of:
+- TCP connection to `index.docker.io:443` failed
+- TLS handshake failed before any certs were exchanged
+- Something is actively dropping the connection
+
+Your earlier curl **from this same VM** worked. So something has changed, OR curl and openssl are routing differently. Let's find out exactly what.
+
+## Run These — One at a Time, Paste Each Output
+
+### Test 1: Does OpenSSL get any connection at all?
+
+```bash
+echo | openssl s_client -connect index.docker.io:443 -servername index.docker.io 2>&1 | head -40
+```
+
+Note: removed the `2>/dev/null` so we can **see** the errors. This will show us exactly what's happening.
+
+### Test 2: Is curl still working right now?
+
+```bash
+curl -v --max-time 10 https://index.docker.io/ 2>&1 | tail -20
+```
+
+Confirming the network path is still alive.
+
+### Test 3: Check if openssl is forcing IPv6 (which you said has no route)
+
+```bash
+# Force IPv4
+echo | openssl s_client -4 -connect index.docker.io:443 -servername index.docker.io 2>&1 | head -30
+```
+
+### Test 4: Try a different approach using a specific IP
+
+```bash
+# Get a working IPv4 address
+getent ahostsv4 index.docker.io | head -1
+
+# Test TCP reachability directly
+nc -zv -w 5 $(getent ahostsv4 index.docker.io | awk '{print $1}' | head -1) 443
+```
+
+### Test 5: Is there still an IPv6 issue?
+
+```bash
+# Show what DNS returns
+getent ahosts index.docker.io | head -5
+
+# Check IPv6 state
+ip -6 addr
+ip -6 route
+cat /proc/sys/net/ipv6/conf/all/disable_ipv6
+```
+
+Earlier you had dangling IPv6 addresses without routes. Did the IPv6 disable actually stick after reboot?
+
+## My Best Guess Without Seeing the Output
+
+The earlier curl showed this:
+```
+*   Trying [2600:1f18:...]:443...
+* Immediate connect fail for 2600:1f18:...: Network is unreachable
+```
+
+Curl tried IPv6 first, **eight times**, all failed immediately, then fell back to IPv4 and succeeded.
+
+**OpenSSL's `s_client` doesn't do Happy Eyeballs.** It takes the first address `getent` returns. If that's IPv6 with no route → instant fail with no output to stdout.
+
+This is very likely the exact same **IPv6-enabled-but-no-transit** problem we identified earlier. If the `sysctl` to disable IPv6 didn't persist, or your DNS config prefers IPv6, openssl is hitting the broken IPv6 address and silently dying.
+
+**And — this may be the same reason `rancher-system-agent` is failing.** Go's default resolver behavior (`GODEBUG=netdns=go`) has the same issue: it grabs the first address and goes, rather than failing over fast like curl does.
+
+## Most Important Commands
+
+Just run these two and paste the output:
+
+```bash
+# Command 1: What's actually happening on the openssl connection?
+echo | openssl s_client -connect index.docker.io:443 -servername index.docker.io 2>&1 | head -20
+
+# Command 2: Force IPv4 and try again
+echo | openssl s_client -4 -connect index.docker.io:443 -servername index.docker.io 2>&1 | head -20
+```
+
+If command 1 fails and command 2 succeeds → **it's the IPv6 issue, it's back**, and that's almost certainly what's breaking the rancher-system-agent too.
+
+If both fail → something else changed since your earlier curl worked.
+
+If both succeed with real cert output → something weird with how the first command was piped, not a real network issue.
+
+**Paste both outputs and we'll know exactly where we stand.** I've been guessing too much; let's get ground truth.
