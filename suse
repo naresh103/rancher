@@ -1,3 +1,16 @@
+
+# The v2 API endpoint - should return 200 or 401 (never 301)
+curl -v -4 --max-time 15 https://index.docker.io/v2/
+
+# Try the manifest for the exact image the agent wants
+curl -v -4 --max-time 15 \
+  https://index.docker.io/v2/rancher/system-agent-installer-k3s/manifests/v1.33.10-k3s1
+
+# Compare with the traditional registry endpoint
+curl -v -4 --max-time 15 https://registry-1.docker.io/v2/
+
+
+######################################
 transactional-update shell
 # Inside the shell:
 zypper ar -f https://download.opensuse.org/tumbleweed/repo/oss/ repo-oss
