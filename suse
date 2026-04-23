@@ -711,3 +711,163 @@ edge-store962-002:/var/lib/rancher/agent #
 Moved Permanently. Redirecting to https://hub.docker.com/
 
 #######################
+
+# Plot Twist: Docker Hub Works Fine — So Why Is the Pull Failing?
+
+This result **rules out** network/firewall/proxy/DNS/TLS as the issue. Look at what we confirmed:
+
+- ✅ DNS resolves (`index.docker.io` → 18.233.78.24)
+- ✅ IPv4 connects cleanly (TLS 1.3 handshake completed)
+- ✅ Certificate is legitimate Amazon-issued `*.docker.com` (no TLS interception)
+- ✅ Docker Hub responds with 301, rate-limit headers intact
+- ✅ `x-ratelimit-remaining: 179` — you're not rate-limited
+- ❌ IPv6 addresses fail ("Network is unreachable") — **this is the smoking gun**
+
+## The Real Root Cause: IPv6 First, IPv4 Broken Fallback
+
+The `rancher-system-agent`'s embedded container pull library (it uses `go-containerregistry` under the hood) resolves DNS, gets **both IPv6 and IPv4 addresses**, and tries **IPv6 first**. IPv6 returns "Network is unreachable" instantly on this VM. Unlike `curl`, which cleanly fails over to IPv4, the Go-based image puller **doesn't reliably fall back** in many versions — it treats the immediate fail as a pull failure and bails. One second later, the agent tries `run.sh` against the empty directory and gets exit 127.
+
+Your `curl` works because curl's Happy Eyeballs implementation fails over in ~300ms. The agent's image pull does not.
+
+## Confirm It
+
+```bash
+# 1. Check IPv6 state
+ip -6 addr
+ip -6 route
+cat /proc/sys/net/ipv6/conf/all/disable_ipv6
+sysctl net.ipv6.conf.all.disable_ipv6
+
+# 2. Force IPv4 for a test pull
+curl -v -4 https://index.docker.io/v2/   # works
+curl -v -6 https://index.docker.io/v2/   # should fail the same way as the agent
+
+# 3. Verify the agent had IPv6 enabled when it ran
+getent ahosts index.docker.io
+```
+
+If `ip -6 addr` shows addresses but `ip -6 route` shows no default route (or the default points nowhere reachable), you have **IPv6 enabled on the interface but no IPv6 transit** — classic edge/corporate network state. This is the exact failure mode.
+
+## The Fix — Three Options, Pick One
+
+### Option 1: Disable IPv6 on this VM (quickest fix)
+
+```bash
+# Runtime
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+# Persistent
+cat > /etc/sysctl.d/99-disable-ipv6.conf <<EOF
+net.ipv6.conf.all.disable_ipv6=1
+net.ipv6.conf.default.disable_ipv6=1
+net.ipv6.conf.lo.disable_ipv6=1
+EOF
+sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
+
+# Force the agent to retry
+rm -rf /var/lib/rancher/agent/applied/*
+systemctl restart rancher-system-agent
+journalctl -u rancher-system-agent -f
+```
+
+This is the **right** fix if IPv6 isn't intended to work at this site. K3s itself runs fine on IPv4-only.
+
+### Option 2: Force IPv4 at the DNS resolver level (more surgical)
+
+Add the Docker Hub hosts explicitly so only IPv4 is returned:
+
+```bash
+cat >> /etc/hosts <<EOF
+18.233.78.24    index.docker.io
+18.233.78.24    registry-1.docker.io
+18.233.78.24    auth.docker.io
+18.233.78.24    production.cloudflare.docker.com
+EOF
+```
+
+Not great because those IPs rotate, but proves the theory.
+
+### Option 3: Fix IPv6 properly (if you actually need dual-stack)
+
+Work with your network team to establish IPv6 transit at the site, or remove the IPv6 addresses that have no route:
+
+```bash
+ip -6 addr flush scope global dev eth0
+# Or disable RA (router advertisement) acceptance on the NIC
+echo 0 > /proc/sys/net/ipv6/conf/eth0/accept_ra
+```
+
+---
+
+## Do This Right Now on store962-002
+
+```bash
+# 1. Disable IPv6
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+# 2. Persist it
+cat > /etc/sysctl.d/99-disable-ipv6.conf <<EOF
+net.ipv6.conf.all.disable_ipv6=1
+net.ipv6.conf.default.disable_ipv6=1
+net.ipv6.conf.lo.disable_ipv6=1
+EOF
+
+# 3. Clear the "applied" marker and force retry
+rm -rf /var/lib/rancher/agent/applied/*
+rm -rf /var/lib/rancher/agent/work/*
+systemctl restart rancher-system-agent
+
+# 4. Watch live (filter out the probe noise)
+journalctl -u rancher-system-agent -f --no-pager \
+  | grep -viE "probe|x509|server-ca.crt|loading CA|appending ca"
+```
+
+You should see within 2–3 minutes:
+
+```
+level=info msg="Pulling image index.docker.io/rancher/system-agent-installer-k3s:v1.33.10-k3s1"
+... [10-30 seconds of real pull time, not 1 second] ...
+level=info msg="[Applyinator] Running command: sh [-c run.sh]"
+level=info msg="[xxx_0:stdout]: [INFO]  Finding release for channel ..."
+level=info msg="[xxx_0:stdout]: [INFO]  Using v1.33.10+k3s1 as release"
+level=info msg="[xxx_0:stdout]: [INFO]  Downloading hash ..."
+... k3s install output ...
+level=info msg="[Applyinator] Command sh [-c run.sh] finished with err: <nil> and exit code: 0"
+```
+
+Then `systemctl status k3s` will show it running, and the cluster will transition from "Updating" to "Active" in Rancher.
+
+---
+
+## This Matters *A Lot* for Your 5,000-Site Rollout
+
+This is a **systemic issue** in your Elemental OS image or site network template. Every single one of your 5,000 sites likely has the same dangling IPv6 addresses without transit, which means **every provisioning will fail the same way**. The fixes that need to be baked in:
+
+1. **In your Elemental `MachineRegistration` cloud-init**: disable IPv6 OR ensure IPv6 transit works
+2. **Better yet — operate a local/regional registry mirror** (as I mentioned before) so the pull is over your internal network (which presumably is IPv4-only)
+3. **Consider**: add `--prefer-ipv4` / `GODEBUG=netdns=go+4` to the `rancher-system-agent` systemd environment as a belt-and-braces fix:
+   ```
+   Environment="GODEBUG=netdns=go"
+   Environment="GONET_PREFER_IPV4=1"
+   ```
+   (The `GODEBUG=netdns=go` forces Go's pure-Go resolver; some versions of the agent respect address-family preference through it.)
+
+For the Elemental `MachineRegistration` YAML that gets baked into every edge ISO, add this to the `cloud-init` stage:
+
+```yaml
+stages:
+  initramfs:
+    - name: "Disable IPv6"
+      sysctl:
+        net.ipv6.conf.all.disable_ipv6: "1"
+        net.ipv6.conf.default.disable_ipv6: "1"
+        net.ipv6.conf.lo.disable_ipv6: "1"
+```
+
+Fix it once at the MachineRegistration level, rebuild the ISO, and sites 2 through 5,000 will just work.
+
+---
+
+**Try the fix above and paste the live agent logs after restart.** You should see the pull actually take real time (10-30+ seconds) instead of 1 second. That's the signal the install is finally proceeding.
