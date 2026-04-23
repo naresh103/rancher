@@ -633,3 +633,81 @@ Apr 23 15:34:28 edge-store962-002 rancher-system-agent[22186]: time="2026-04-23T
 edge-store962-002:/var/lib/rancher/agent # 
 
 ####################
+ curl -v https://index.docker.io
+* Host index.docker.io:443 was resolved.
+* IPv6: 2600:1f18:2148:bc01:32e5:8cab:48c6:88f0, 2600:1f18:2148:bc00:154:b6de:c219:cb4e, 2600:1f18:2148:bc01:271b:c5ab:c009:4e27, 2600:1f18:2148:bc01:fb32:f1b8:532f:9c97, 2600:1f18:2148:bc02:df4b:531c:83da:7969, 2600:1f18:2148:bc00:cbcf:d15f:638f:1066, 2600:1f18:2148:bc01:2bed:275b:b952:26d2, 2600:1f18:2148:bc02:d8b9:785e:5115:d976
+* IPv4: 18.233.78.24, 50.19.60.231, 44.206.181.40, 54.159.86.7, 34.233.14.88, 3.209.48.60, 100.51.202.45, 54.172.107.181
+*   Trying [2600:1f18:2148:bc01:32e5:8cab:48c6:88f0]:443...
+* Immediate connect fail for 2600:1f18:2148:bc01:32e5:8cab:48c6:88f0: Network is unreachable
+*   Trying [2600:1f18:2148:bc00:154:b6de:c219:cb4e]:443...
+* Immediate connect fail for 2600:1f18:2148:bc00:154:b6de:c219:cb4e: Network is unreachable
+*   Trying [2600:1f18:2148:bc01:271b:c5ab:c009:4e27]:443...
+* Immediate connect fail for 2600:1f18:2148:bc01:271b:c5ab:c009:4e27: Network is unreachable
+*   Trying [2600:1f18:2148:bc01:fb32:f1b8:532f:9c97]:443...
+* Immediate connect fail for 2600:1f18:2148:bc01:fb32:f1b8:532f:9c97: Network is unreachable
+*   Trying [2600:1f18:2148:bc02:df4b:531c:83da:7969]:443...
+* Immediate connect fail for 2600:1f18:2148:bc02:df4b:531c:83da:7969: Network is unreachable
+*   Trying [2600:1f18:2148:bc00:cbcf:d15f:638f:1066]:443...
+* Immediate connect fail for 2600:1f18:2148:bc00:cbcf:d15f:638f:1066: Network is unreachable
+*   Trying [2600:1f18:2148:bc01:2bed:275b:b952:26d2]:443...
+* Immediate connect fail for 2600:1f18:2148:bc01:2bed:275b:b952:26d2: Network is unreachable
+*   Trying [2600:1f18:2148:bc02:d8b9:785e:5115:d976]:443...
+* Immediate connect fail for 2600:1f18:2148:bc02:d8b9:785e:5115:d976: Network is unreachable
+*   Trying 18.233.78.24:443...
+* ALPN: curl offers h2,http/1.1
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256 / x25519 / RSASSA-PSS
+* ALPN: server accepted h2
+* Server certificate:
+*  subject: CN=*.docker.com
+*  start date: Sep 24 00:00:00 2025 GMT
+*  expire date: Oct 23 23:59:59 2026 GMT
+*  subjectAltName: host "index.docker.io" matched cert's "*.docker.io"
+*  issuer: C=US; O=Amazon; CN=Amazon RSA 2048 M01
+*  SSL certificate verify ok.
+*   Certificate level 0: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+*   Certificate level 1: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+*   Certificate level 2: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+* Connected to index.docker.io (18.233.78.24) port 443
+* using HTTP/2
+* [HTTP/2] [1] OPENED stream for https://index.docker.io/
+* [HTTP/2] [1] [:method: GET]
+* [HTTP/2] [1] [:scheme: https]
+* [HTTP/2] [1] [:authority: index.docker.io]
+* [HTTP/2] [1] [:path: /]
+* [HTTP/2] [1] [user-agent: curl/8.14.1]
+* [HTTP/2] [1] [accept: */*]
+> GET / HTTP/2
+> Host: index.docker.io
+> User-Agent: curl/8.14.1
+> Accept: */*
+> 
+* Request completely sent off
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+< HTTP/2 301 
+< date: Thu, 23 Apr 2026 19:39:59 GMT
+< content-type: text/plain; charset=utf-8
+< content-length: 57
+< location: https://hub.docker.com/
+< x-ratelimit-limit: 180
+< x-ratelimit-reset: 1776973259
+< x-ratelimit-remaining: 179
+< x-ratelimit-ip: 68.70.104.4
+< vary: Accept
+< x-frame-options: deny
+< x-content-type-options: nosniff
+< x-xss-protection: 1; mode=block
+< strict-transport-security: max-age=31536000
+< 
+* Connection #0 to host index.docker.io left intact
+Moved Permanently. Redirecting to https://hub.docker.com/
+
+#######################
