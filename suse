@@ -884,3 +884,148 @@ Fix it once at the MachineRegistration level, rebuild the ISO, and sites 2 throu
 ---
 
 **Try the fix above and paste the live agent logs after restart.** You should see the pull actually take real time (10-30+ seconds) instead of 1 second. That's the signal the install is finally proceeding.
+
+
+################################### That Changes Things — Let's Re-Examine
+
+If every node has unrestricted internet access, then my "corporate firewall blocks `auth.docker.io`" theory is wrong. Let me reconsider the evidence without that assumption.
+
+## Let's Actually Prove Internet Access From This VM
+
+"Internet access" can mean different things to different people. Before we pivot the diagnosis, let's verify what `edge-store962-002` can actually reach — not what the network policy says it should reach.
+
+Run these **from the edge VM itself** (not from your laptop):
+
+```bash
+# Test 1: Full Docker Registry v2 authentication flow
+echo "=== auth.docker.io reachability ==="
+curl -v -4 --max-time 10 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" \
+  "https://auth.docker.io/token?service=registry.docker.io&scope=repository:rancher/system-agent-installer-k3s:pull"
+
+echo "=== production.cloudflare.docker.com (blob CDN) ==="
+curl -v -4 --max-time 10 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" \
+  https://production.cloudflare.docker.com/
+
+echo "=== registry-1.docker.io (alternate endpoint) ==="
+curl -v -4 --max-time 10 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" \
+  https://registry-1.docker.io/v2/
+
+# Test 2: End-to-end pull via skopeo (what the agent is trying to do)
+which skopeo || transactional-update pkg install -y skopeo  # reboot may be needed on Elemental
+skopeo copy --debug \
+  docker://rancher/system-agent-installer-k3s:v1.33.10-k3s1 \
+  docker-archive:/tmp/test-pull.tar 2>&1 | tail -40
+
+# Test 3: How large is the result?
+ls -lh /tmp/test-pull.tar 2>/dev/null
+```
+
+The skopeo test is the critical one. **skopeo uses the same `go-containerregistry` library that `rancher-system-agent` uses internally.** If skopeo succeeds, the agent's pull logic is broken. If skopeo fails, we'll see the real underlying error that the agent is hiding.
+
+## If Skopeo Succeeds
+
+Then we've confirmed:
+- ✅ Network path to all Docker Hub endpoints works
+- ✅ TLS chain is valid
+- ✅ The image exists and is pullable anonymously
+- ❌ The `rancher-system-agent` specifically cannot pull it
+
+That points to an **agent-level issue**, which narrows to a few possibilities:
+
+### Possibility A: Agent runs in a constrained security context
+
+The agent runs as a systemd unit. If SUSE Elemental has any of these enabled, they can break network calls from the agent without breaking them from your interactive shell:
+
+```bash
+# Check the systemd unit's sandbox
+systemctl cat rancher-system-agent | grep -iE "PrivateNetwork|IPAddressDeny|RestrictAddressFamilies|SystemCallFilter|NoNewPrivileges|ProtectSystem|MountFlags"
+
+# Check AppArmor/SELinux
+aa-status 2>/dev/null | grep -i rancher
+getenforce 2>/dev/null
+ausearch -m avc -ts recent 2>/dev/null | head -20
+```
+
+### Possibility B: Agent version has a known pull bug
+
+```bash
+# Get the agent version
+/usr/local/bin/rancher-system-agent --version 2>&1 || \
+  find / -name "rancher-system-agent" -type f -executable 2>/dev/null -exec {} --version \; 2>&1
+```
+
+Versions in the 0.3.x range had a [known issue](https://github.com/rancher/system-agent/issues) with IPv6-preferring DNS resolution and silent failures. If you're on something old or bleeding-edge, there may be a matching bug.
+
+### Possibility C: The working directory's filesystem doesn't support what the agent needs
+
+Some immutable-OS setups (SUSE Elemental is one) make parts of the filesystem read-only or overlayfs-based. The agent may be able to create the work directory but fail silently when extracting the tar:
+
+```bash
+mount | grep -E "/var/lib/rancher|/var"
+df -T /var/lib/rancher/agent/work/
+ls -la /var/lib/rancher/agent/
+touch /var/lib/rancher/agent/work/testfile && echo "writable" || echo "NOT writable"
+```
+
+If `/var/lib/rancher` is on an overlay or tmpfs with restrictive flags, that could break extraction even though the pull itself works.
+
+### Possibility D: Agent is pulling to a different path than I think
+
+```bash
+# See everything the agent has ever written
+find /var/lib/rancher/agent -type f -newer /var/log/messages 2>/dev/null | head -30
+
+# Strace the agent during a pull attempt to see what it's actually doing
+# (This is invasive but definitive)
+systemctl stop rancher-system-agent
+strace -f -e trace=network,openat,write,execve \
+  -o /tmp/agent-trace.log \
+  /usr/local/bin/rancher-system-agent sentinel &
+STRACE_PID=$!
+sleep 60
+kill $STRACE_PID
+
+# Look at what the agent actually tried to do
+grep -iE "connect|openat.*work|openat.*image|execve" /tmp/agent-trace.log | head -60
+```
+
+The strace will show every network call and file operation — we'll see *exactly* what the agent tries to do and where it fails.
+
+## If Skopeo Fails
+
+Then we have real network evidence. The `--debug` output will show exactly which host and which HTTP operation fails. Common findings:
+
+| skopeo error | Real cause |
+|---|---|
+| `dial tcp: i/o timeout` to `auth.docker.io` | Firewall drop on that subdomain (despite "internet access") |
+| `x509: certificate signed by unknown authority` | TLS inspection proxy not in trust store |
+| `manifest unknown` | Version tag genuinely doesn't exist |
+| `toomanyrequests` | Rate limited (maybe a NAT issue with many sites sharing an egress IP) |
+| `MTU` or connection reset mid-transfer | Corporate network has small MTU with DF flag breaking large blobs |
+
+## The MTU Angle — Worth Considering
+
+Here's a thought I haven't raised yet: you said 1-second failures, every time. Small blobs could fit in one packet and work; large blobs might not. Check MTU:
+
+```bash
+ip link show | grep mtu
+ping -M do -s 1472 -c 3 registry-1.docker.io     # tests 1500 MTU
+ping -M do -s 1372 -c 3 registry-1.docker.io     # tests 1400 MTU (VPN-typical)
+ping -M do -s 1272 -c 3 registry-1.docker.io     # tests 1300 MTU
+```
+
+If 1472 fails but 1372 works, you have an MTU mismatch — very common on corporate networks with IPsec tunnels, and it specifically breaks large HTTPS transfers like image layers while leaving small requests (like your earlier curl to `index.docker.io`) untouched. Your curl succeeded because the response was a tiny 301 redirect. An image pull transfers tens of MB of blobs and would fail on MTU issues.
+
+## Where to Go from Here
+
+Please run these, in order, and paste the output:
+
+1. **The three reachability curls** at the top — proves which Docker Hub subdomains are actually reachable
+2. **The skopeo test** — proves whether a normal container pull succeeds from this VM's network context
+3. **If skopeo succeeds**: the agent version check and the systemd sandbox check
+4. **If skopeo fails**: paste the `--debug` tail and we go from there
+5. **The MTU ping tests** — rules out or confirms an MTU issue
+
+Until we see the output of a real pull attempt with a tool that surfaces errors (skopeo), we're guessing. The agent has been lying to us for 40+ retry cycles — we need a tool that tells the truth.
+
+Paste the output and we'll have a real answer rather than another theory.
