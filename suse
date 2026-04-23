@@ -1,4 +1,141 @@
 
+
+
+# Same Failure — Confirming the Agent Ignores Podman's Config
+
+Exactly as predicted. The agent still failed with the same 1-second exit-127 pattern at 16:24:44, and this is important evidence:
+
+```
+16:24:44 Using private registry config file at /etc/rancher/agent/registries.yaml
+16:24:44 Pulling image index.docker.io/rancher/system-agent-installer-k3s:v1.33.10-k3s1
+16:24:44 Running command: sh [-c run.sh]
+16:24:44 run.sh: command not found
+```
+
+And:
+```
+$ cat /etc/rancher/agent/registries.yaml
+{"configs":{},"mirrors":null}
+```
+
+**Confirmed:**
+1. The agent reads `/etc/rancher/agent/registries.yaml` — which is **empty**
+2. The agent ignores `/etc/containers/registries.conf` — your `insecure=true` setting had zero effect on it
+3. The agent still pulls directly from `index.docker.io` using its own Go TLS stack
+
+Now we have a clear path. The fix is to update the **OS trust store** (which the Go stack uses) with the corporate CA. Let's do it now.
+
+## Extract the Corporate Intercepting CA
+
+```bash
+# Grab the full cert chain for the host the agent is pulling from
+echo | openssl s_client -showcerts -connect index.docker.io:443 -servername index.docker.io 2>/dev/null \
+  | awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/' \
+  > /tmp/docker-chain.pem
+
+# See what's in it
+openssl crl2pkcs7 -nocrl -certfile /tmp/docker-chain.pem \
+  | openssl pkcs7 -print_certs -noout
+```
+
+You'll get output that looks like one of these:
+
+**Case A — No TLS interception (genuine Docker chain):**
+```
+subject=CN = *.docker.io
+issuer=C = US, O = Amazon, CN = Amazon RSA 2048 M01
+subject=C = US, O = Amazon, CN = Amazon RSA 2048 M01
+issuer=C = US, O = Amazon, CN = Amazon Root CA 1
+```
+
+**Case B — TLS interception in place (corporate CA):**
+```
+subject=CN = *.docker.io
+issuer=CN = Advance-Proxy-CA, O = Advance Auto Parts
+subject=CN = Advance-Proxy-CA, O = Advance Auto Parts
+issuer=CN = Advance-Root-CA, O = Advance Auto Parts
+subject=CN = Advance-Root-CA, O = Advance Auto Parts
+```
+
+**Paste the output** so I can tell you which case you're in.
+
+## If Case B (TLS Interception Confirmed)
+
+Install the full chain into the OS trust store:
+
+```bash
+# Put the corporate CA(s) into the trust anchor directory
+cp /tmp/docker-chain.pem /etc/pki/trust/anchors/corp-intercepting-chain.pem
+
+# Update the system trust bundle (this regenerates /etc/ssl/certs/ca-certificates.crt
+# and /var/lib/ca-certificates/ca-bundle.pem, which is what Go reads)
+update-ca-certificates
+
+# Verify the CA was added
+grep -c "CERTIFICATE" /var/lib/ca-certificates/ca-bundle.pem
+# Should show a higher number than before
+
+
+# Test that Go tooling now trusts it
+curl -v https://index.docker.io/v2/ 2>&1 | grep -iE "verify|issuer|subject"
+```
+
+Then restart the agent and force a retry:
+
+```bash
+# Stop the agent
+systemctl stop rancher-system-agent
+
+# Clear plan state
+rm -rf /var/lib/rancher/agent/applied/*
+rm -rf /var/lib/rancher/agent/work/*
+
+# Start it back up
+systemctl start rancher-system-agent
+
+# Watch live (filtered)
+journalctl -u rancher-system-agent -f --no-pager \
+  | grep -viE "probe|x509|loading CA|appending ca|server-ca.crt|kube-apiserver|kube-controller-manager|kube-scheduler"
+```
+
+## If Case A (No Interception)
+
+Then TLS interception isn't the issue and we have a different problem. But given your earlier `podman pull` explicitly failed with `x509: certificate signed by unknown authority` against `registry.suse.com`, I'm strongly expecting Case B.
+
+## Why Your Earlier curl Worked but Agent/Podman Fail
+
+On Elemental/SLE Micro, there are multiple trust stores in play:
+
+| Tool | Trust source |
+|---|---|
+| `curl` | `/etc/ssl/ca-bundle.pem` (often has a broader set) |
+| Go tooling (`rancher-system-agent`, skopeo's Go parts) | `/etc/ssl/certs/ca-certificates.crt` via Go's `x509.SystemCertPool()` |
+| Podman/cri-o | `/etc/pki/tls/certs/` and `/etc/containers/certs.d/` |
+| OpenSSL tools | `/etc/ssl/certs/` |
+
+Sometimes a corporate CA ends up in one but not the others — that's why curl succeeded but podman didn't. `update-ca-certificates` on SUSE updates **all** of these, so once you run it, every tool on the system (including the agent) will have consistent trust.
+
+## One-Liner to Do It All
+
+If you just want to pull the trigger and see it work:
+
+```bash
+echo | openssl s_client -showcerts -connect index.docker.io:443 -servername index.docker.io 2>/dev/null \
+  | awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/' \
+  > /etc/pki/trust/anchors/corp-chain.pem && \
+update-ca-certificates && \
+rm -rf /var/lib/rancher/agent/applied/* /var/lib/rancher/agent/work/* && \
+systemctl restart rancher-system-agent && \
+sleep 5 && \
+journalctl -u rancher-system-agent --since "10 sec ago" --no-pager \
+  | grep -viE "probe|x509|loading CA|server-ca.crt|kube-"
+```
+
+**Paste the openssl cert chain output first** so we confirm what's actually intercepting the traffic. If there's no interception, we need to look elsewhere entirely. If there is, the one-liner above should get K3s installing within 2–3 minutes.
+
+
+
+########################
 # The v2 API endpoint - should return 200 or 401 (never 301)
 curl -v -4 --max-time 15 https://index.docker.io/v2/
 
