@@ -1,0 +1,30 @@
+
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+# 2. Persist it
+cat > /etc/sysctl.d/99-disable-ipv6.conf <<EOF
+net.ipv6.conf.all.disable_ipv6=1
+net.ipv6.conf.default.disable_ipv6=1
+net.ipv6.conf.lo.disable_ipv6=1
+EOF
+
+# 3. Clear the "applied" marker and force retry
+rm -rf /var/lib/rancher/agent/applied/*
+rm -rf /var/lib/rancher/agent/work/*
+systemctl restart rancher-system-agent
+
+nmlci device connect ens3
+
+sudo nmcli connection modify "ens3" \
+  ipv4.addresses 10.109.163.54/25 \
+  ipv4.gateway 10.109.163.1 \
+  ipv4.dns "172.17.10.8 172.17.10.11" \
+  ipv4.method manual
+
+nmcli connection down "ens3" & nmcli connection up "ens3"
+
+hostnamectl set-hostname edge-store963-004
+
+echo "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGfeFhDP2B+nF7s+2ydyPQp2b+enjpXzo0f1qgOmN3tWpPU1OcFwAw9dLZNgUvMGh8mfS1EzuTi4CZALLsV476g= root@pdadminprd01" >> /root/.ssh/authorized_keys ;
+chmod 600 /root/.ssh/authorized_keys ;
