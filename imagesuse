@@ -26,5 +26,5 @@ nmcli connection down "ens3" & nmcli connection up "ens3"
 
 hostnamectl set-hostname edge-store963-004
 
-echo "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGfeFhDP2B+nF7s+2ydyPQp2b+enjpXzo0f1qgOmN3tWpPU1OcFwAw9dLZNgUvMGh8mfS1EzuTi4CZALLsV476g= root@pdadminprd01" >> /root/.ssh/authorized_keys ;
+echo "" >> /root/.ssh/authorized_keys ;
 chmod 600 /root/.ssh/authorized_keys ;
