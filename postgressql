@@ -1,0 +1,33 @@
+Step-by-Step: Enable PackageHub + Add PostgreSQL 18 Repository
+1. Check current registration status
+Bashsudo transactional-update register --status
+sudo SUSEConnect --status-text
+2. List available extensions/modules
+Bashsudo transactional-update register --list-extensions
+# or
+sudo SUSEConnect --list-extensions
+3. Enable PackageHub (requires valid SCC registration code)
+Run this inside a transactional-update session:
+Bashsudo transactional-update register -p PackageHub/15.7/x86_64
+(Replace 15.7 with your actual base version if different — SLE Micro 6.2 is based on SLE 15 SPx technology.)
+If you get a version mismatch, first register the base product if needed:
+Bashsudo transactional-update register -r YOUR_SCC_REGISTRATION_CODE
+4. Add the official PostgreSQL PGDG Repository
+Bashsudo rpm --import https://zypp.postgresql.org/keys/PGDG-RPM-GPG-KEY-SLES15
+
+sudo zypper install https://download.postgresql.org/pub/repos/zypp/reporpms/SLES-15.7-x86_64/pgdg-suse-repo-latest.noarch.rpm
+5. Refresh repositories and install PostgreSQL 18
+Bashsudo transactional-update pkg install postgresql18-server postgresql18-contrib
+Then reboot the system for the transaction to take effect:
+Bashsudo reboot
+6. After reboot – Initialize and start PostgreSQL
+Bashsudo postgresql-setup --initdb
+sudo systemctl enable --now postgresql
+
+Alternative One-Liner Approach (if PackageHub is already enabled)
+If you already enabled PackageHub successfully, you can try directly:
+Bashsudo transactional-update pkg install postgresql18-server postgresql18-contrib
+
+After installation, verify with:
+Bashpsql --version
+systemctl status postgresql
