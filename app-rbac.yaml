@@ -1,0 +1,100 @@
+✅ Complete End-to-End Setup for app-ns + app-team-sa
+Here is everything you need — updated and consistent with your latest request.
+Step 1: Create Namespace and ServiceAccount
+Run these two commands:
+Bash# 1. Create Namespace
+kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml create ns app-ns
+
+# 2. Create ServiceAccount
+kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml create sa app-team-sa -n app-ns
+Step 2: Apply RBAC (Role + RoleBinding)
+Save the following as app-team-rbac.yaml:
+YAMLapiVersion: v1
+kind: Namespace
+metadata:
+  name: app-ns
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-team-sa
+  namespace: app-ns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app-team-role
+  namespace: app-ns
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "services", "configmaps", "secrets", "persistentvolumeclaims", "events", "endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Workloads
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "scale"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Autoscaling
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Networking
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Useful
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: app-team-binding
+  namespace: app-ns
+subjects:
+  - kind: ServiceAccount
+    name: app-team-sa
+    namespace: app-ns
+roleRef:
+  kind: Role
+  name: app-team-role
+  apiGroup: rbac.authorization.k8s.io
+Apply it:
+Bashkubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml apply -f app-team-rbac.yaml
+Step 3: Generate Token (1-year validity)
+Bashkubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml create token app-team-sa -n app-ns --duration=8760h
+Copy the long token string that appears.
+Step 4: Generate Ready-to-Use Limited Kubeconfig
+Run these commands (install yq first if not present: dnf install -y yq):
+Bash# Generate token and create limited kubeconfig in one go
+TOKEN=$(kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml create token app-team-sa -n app-ns --duration=8760h)
+
+kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml config view --raw --minify \
+  | yq '
+    .clusters[0].cluster.server = "https://10.109.161.55:6443" |
+    .users[0].name = "app-team-sa" |
+    .users[0].user.token = env(TOKEN) |
+    .users[0].user.delete("client-certificate-data") |
+    .users[0].user.delete("client-key-data") |
+    .contexts[0].context.namespace = "app-ns" |
+    .contexts[0].context.user = "app-team-sa" |
+    .contexts[0].name = "app-team-context" |
+    .current-context = "app-team-context"
+  ' > /opt/mirantis/app-team-kubeconfig.yaml
+Step 5: Verify the Limited Access
+Bashkubectl --kubeconfig /opt/mirantis/app-team-kubeconfig.yaml get pods -n app-ns
+kubectl --kubeconfig /opt/mirantis/app-team-kubeconfig.yaml get ns   # Should only show app-ns (or limited view)
+Final Files to Share with Deployment Team
+
+/opt/mirantis/app-team-kubeconfig.yaml ← Main file to send
+Instructions:
+Use export KUBECONFIG=app-team-kubeconfig.yaml
+Always work in app-ns namespace
+
+
+You’re all set! The team now has secure, limited access to deploy containers only inside app-ns.
+Would you like a sample deployment YAML (e.g., Nginx) ready for them?
