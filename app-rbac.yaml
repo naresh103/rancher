@@ -98,3 +98,40 @@ Always work in app-ns namespace
 
 You’re all set! The team now has secure, limited access to deploy containers only inside app-ns.
 Would you like a sample deployment YAML (e.g., Nginx) ready for them?
+
+
+
+
+
+# 1. Generate the token
+TOKEN=$(kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml create token app-team-sa -n app-ns --duration=8760h)
+
+echo "Token generated successfully"
+
+# 2. Create base kubeconfig with VIP and limited user
+kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml config view --raw --minify > /tmp/base-kubeconfig.yaml
+
+# 3. Create the final limited kubeconfig (manual edits via sed + cat)
+cat > /opt/mirantis/app-team-kubeconfig.yaml << EOF
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: $(kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+    server: https://10.109.161.55:6443
+  name: my-onprem-cluster
+contexts:
+- context:
+    cluster: my-onprem-cluster
+    namespace: app-ns
+    user: app-team-sa
+  name: app-team-context
+current-context: app-team-context
+kind: Config
+preferences: {}
+users:
+- name: app-team-sa
+  user:
+    token: $TOKEN
+EOF
+
+echo "Limited kubeconfig created at /opt/mirantis/app-team-kubeconfig.yaml"
