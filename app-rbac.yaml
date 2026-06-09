@@ -135,3 +135,42 @@ users:
 EOF
 
 echo "Limited kubeconfig created at /opt/mirantis/app-team-kubeconfig.yaml"
+
+
+#########################
+Alternative (Even Simpler): Pure YAML Template
+If the above command fails, do this:
+
+Run the token command and copy the long token:
+
+kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml create token app-team-sa -n app-ns --duration=8760h
+
+Create the file manually:
+
+cat > /opt/mirantis/app-team-kubeconfig.yaml << 'EOF'
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: PASTE_CA_DATA_HERE
+    server: https://10.109.161.55:6443
+  name: my-onprem-cluster
+contexts:
+- context:
+    cluster: my-onprem-cluster
+    namespace: app-ns
+    user: app-team-sa
+  name: app-team-context
+current-context: app-team-context
+kind: Config
+preferences: {}
+users:
+- name: app-team-sa
+  user:
+    token: PASTE_TOKEN_HERE
+EOF
+How to get certificate-authority-data:
+
+kubectl --kubeconfig /opt/mirantis/my-onprem-cluster-kubeconfig1.yaml config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}'
+Replace PASTE_CA_DATA_HERE and PASTE_TOKEN_HERE with the actual values.
+
+Would you like me to also give you the full end-to-end script (all steps combined) that you can copy-paste easily?
